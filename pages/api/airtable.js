@@ -7,8 +7,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch all data including Priorities table
-    const [milestonesData, actionsData, projectsData, prioritiesData] = await Promise.all([
+    // Try to fetch Priorities table - if it fails, we'll handle it
+    let prioritiesData = { records: [] };
+    try {
+      const prioritiesResponse = await fetch(
+        `https://api.airtable.com/v0/${BASE_ID}/Priorities`,
+        { headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` } }
+      );
+      if (prioritiesResponse.ok) {
+        prioritiesData = await prioritiesResponse.json();
+      }
+    } catch (e) {
+      console.log('Priorities table not found or error:', e);
+    }
+
+    // Fetch main data
+    const [milestonesData, actionsData, projectsData] = await Promise.all([
       fetch(`https://api.airtable.com/v0/${BASE_ID}/Milestones`, {
         headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
       }).then(r => r.json()),
@@ -18,10 +32,6 @@ export default async function handler(req, res) {
       }).then(r => r.json()),
       
       fetch(`https://api.airtable.com/v0/${BASE_ID}/Projects`, {
-        headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
-      }).then(r => r.json()),
-      
-      fetch(`https://api.airtable.com/v0/${BASE_ID}/Priorities`, {
         headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
       }).then(r => r.json())
     ]);
