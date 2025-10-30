@@ -19,11 +19,10 @@ export default function GanttChart() {
       if (!response.ok) throw new Error('Failed to fetch data');
       const result = await response.json();
       
-      console.log('Fetched data:', result); // Debug
+      console.log('Fetched data:', result);
       
       setData(result);
       
-      // Auto-expand all priorities
       const priorities = {};
       result.projects?.forEach(p => {
         priorities[p.id] = true;
@@ -122,7 +121,6 @@ export default function GanttChart() {
     );
   }
 
-  // Group milestones by priority
   const priorityGroups = {};
   
   data?.milestones?.forEach(milestone => {
@@ -140,7 +138,6 @@ export default function GanttChart() {
     });
   });
 
-  // Show debug info if no milestones
   if (Object.keys(priorityGroups).length === 0) {
     return (
       <div className="w-full p-6">
@@ -154,6 +151,14 @@ export default function GanttChart() {
               <p className="font-bold">Sample milestone fields:</p>
               <pre className="text-xs bg-white p-2 mt-2 overflow-auto">
                 {JSON.stringify(data.milestones[0].fields, null, 2)}
+              </pre>
+            </div>
+          )}
+          {data?.projects?.[0] && (
+            <div className="mt-4">
+              <p className="font-bold">Sample project fields:</p>
+              <pre className="text-xs bg-white p-2 mt-2 overflow-auto">
+                {JSON.stringify(data.projects[0].fields, null, 2)}
               </pre>
             </div>
           )}
@@ -198,7 +203,6 @@ export default function GanttChart() {
       </div>
 
       <div className="min-w-[1200px]">
-        {/* Header */}
         <div className="flex mb-4">
           <div className="w-80 px-4 py-2">
             <span className="font-semibold text-gray-700">Activity</span>
@@ -212,10 +216,8 @@ export default function GanttChart() {
           </div>
         </div>
 
-        {/* Timeline Grid */}
         {Object.entries(priorityGroups).map(([priorityName, milestones]) => (
           <div key={priorityName} className="mb-6">
-            {/* Priority Header */}
             <div 
               className="flex items-center bg-gray-100 px-4 py-3 cursor-pointer hover:bg-gray-200 transition-colors rounded"
               onClick={() => togglePriority(priorityName)}
@@ -228,17 +230,14 @@ export default function GanttChart() {
               <span className="ml-2 text-sm text-gray-600">({milestones.length})</span>
             </div>
 
-            {/* Milestones */}
             {expandedPriorities[priorityName] && milestones.map((milestone) => {
               const actionIds = milestone.fields.Actions || [];
               const milestoneActions = data.actions?.filter(a => actionIds.includes(a.id)) || [];
               const isExpanded = expandedMilestones[milestone.id];
               
-              // Get dates
               const deadline = dateToMonth(milestone.fields.Deadline);
               const expectedDeadline = dateToMonth(milestone.fields['Expected Completion Date']);
               
-              // Calculate milestone span from actions
               let milestoneStart = deadline;
               let milestoneEnd = deadline;
               
@@ -258,7 +257,6 @@ export default function GanttChart() {
 
               return (
                 <div key={milestone.id}>
-                  {/* Milestone Row */}
                   <div className="flex items-center border-b border-gray-100 hover:bg-gray-50">
                     <div className="w-80 px-4 py-3 text-sm text-gray-700 flex items-center gap-2">
                       {milestoneActions.length > 0 && (
@@ -281,13 +279,11 @@ export default function GanttChart() {
                       )}
                     </div>
                     <div className="flex-1 relative h-12">
-                      {/* Month grid */}
                       <div className="absolute inset-0 flex">
                         {months.map((_, i) => (
                           <div key={i} className="flex-1 border-l border-gray-200"></div>
                         ))}
                       </div>
-                      {/* Milestone bar */}
                       {milestoneStart && milestoneEnd && (
                         <div
                           className={`absolute top-2 h-8 ${isAtRisk ? 'bg-red-500' : 'bg-blue-600'} rounded shadow-sm flex items-center justify-center transition-all hover:shadow-md opacity-90`}
@@ -301,7 +297,6 @@ export default function GanttChart() {
                     </div>
                   </div>
 
-                  {/* Expanded Actions */}
                   {isExpanded && milestoneActions.map((action) => {
                     const actionStart = dateToMonth(action.fields['Start date']);
                     const actionEnd = dateToMonth(action.fields['End date']);
@@ -320,13 +315,11 @@ export default function GanttChart() {
                           </span>
                         </div>
                         <div className="flex-1 relative h-10">
-                          {/* Month grid */}
                           <div className="absolute inset-0 flex">
                             {months.map((_, i) => (
                               <div key={i} className="flex-1 border-l border-gray-200"></div>
                             ))}
                           </div>
-                          {/* Action bar */}
                           {actionStart && actionEnd && (
                             <div
                               className={`absolute top-1 h-6 ${statusColor} rounded shadow-sm flex items-center justify-center opacity-80`}
