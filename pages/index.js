@@ -6,7 +6,13 @@ export default function GanttChart() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedMilestones, setExpandedMilestones] = useState({});
-  const [expandedPriorities, setExpandedPriorities] = useState({});
+  const [expandedPriorities, setExpandedPriorities] = useState({
+    '1. Governance and Leadership': true,
+    '2. Grant programme': true,
+    '3. Infrastructure Capability Support and Development': true,
+    '4. Community Involvement and Engagement': true,
+    '5. Learning and impact': true
+  });
   const [showAllActions, setShowAllActions] = useState(false);
 
   useEffect(() => {
@@ -20,15 +26,7 @@ export default function GanttChart() {
       const result = await response.json();
       
       console.log('Fetched data:', result);
-      
       setData(result);
-      
-      const priorities = {};
-      result.priorities?.forEach(p => {
-        priorities[p.id] = true;
-      });
-      setExpandedPriorities(priorities);
-      
       setLoading(false);
     } catch (err) {
       console.error('Error:', err);
@@ -60,7 +58,6 @@ export default function GanttChart() {
       const monthObj = months.find(m => m.date === yearMonth);
       return monthObj ? monthObj.value : null;
     } catch (e) {
-      console.error('Date parse error:', dateString, e);
       return null;
     }
   };
@@ -121,19 +118,23 @@ export default function GanttChart() {
     );
   }
 
+  // Group milestones by priority using the Projects table
   const priorityGroups = {};
   
   data?.milestones?.forEach(milestone => {
-    const priorityIds = milestone.fields['Priority (from Projects)'] || [];
+    const projectIds = milestone.fields.Projects || [];
     
-    priorityIds.forEach(priorityId => {
-      const priority = data.priorities?.find(p => p.id === priorityId);
-      if (priority) {
-        const priorityName = priority.fields.Priority || priority.fields.Name || 'Uncategorized';
+    projectIds.forEach(projectId => {
+      const project = data.projects?.find(p => p.id === projectId);
+      if (project && project.fields.Priorities && project.fields.Priorities.length > 0) {
+        // Use the first priority name from the Priorities field
+        const priorityName = project.fields.Priorities[0];
         if (!priorityGroups[priorityName]) {
           priorityGroups[priorityName] = [];
         }
-        priorityGroups[priorityName].push(milestone);
+        if (!priorityGroups[priorityName].some(m => m.id === milestone.id)) {
+          priorityGroups[priorityName].push(milestone);
+        }
       }
     });
   });
@@ -141,28 +142,17 @@ export default function GanttChart() {
   if (Object.keys(priorityGroups).length === 0) {
     return (
       <div className="w-full p-6">
-        <h1 className="text-2xl font-bold mb-4">Debug Information</h1>
+        <h1 className="text-2xl font-bold mb-4">No Data Found</h1>
         <div className="bg-gray-100 p-4 rounded">
-          <p className="mb-2"><strong>Milestones found:</strong> {data?.milestones?.length || 0}</p>
-          <p className="mb-2"><strong>Actions found:</strong> {data?.actions?.length || 0}</p>
-          <p className="mb-2"><strong>Projects found:</strong> {data?.projects?.length || 0}</p>
-          <p className="mb-2"><strong>Priorities found:</strong> {data?.priorities?.length || 0}</p>
-          {data?.milestones?.[0] && (
-            <div className="mt-4">
-              <p className="font-bold">Sample milestone fields:</p>
-              <pre className="text-xs bg-white p-2 mt-2 overflow-auto">
-                {JSON.stringify(data.milestones[0].fields, null, 2)}
-              </pre>
-            </div>
-          )}
-          {data?.priorities?.[0] && (
-            <div className="mt-4">
-              <p className="font-bold">Sample priority fields:</p>
-              <pre className="text-xs bg-white p-2 mt-2 overflow-auto">
-                {JSON.stringify(data.priorities[0].fields, null, 2)}
-              </pre>
-            </div>
-          )}
+          <p className="mb-2">Unable to group milestones by priority.</p>
+          <p className="mb-2"><strong>Milestones:</strong> {data?.milestones?.length || 0}</p>
+          <p className="mb-2"><strong>Projects:</strong> {data?.projects?.length || 0}</p>
+          <button 
+            onClick={fetchData}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -217,7 +207,7 @@ export default function GanttChart() {
           </div>
         </div>
 
-        {Object.entries(priorityGroups).map(([priorityName, milestones]) => (
+        {Object.entries(priorityGroups).sort((a, b) => a[0].localeCompare(b[0])).map(([priorityName, milestones]) => (
           <div key={priorityName} className="mb-6">
             <div 
               className="flex items-center bg-gray-100 px-4 py-3 cursor-pointer hover:bg-gray-200 transition-colors rounded"
