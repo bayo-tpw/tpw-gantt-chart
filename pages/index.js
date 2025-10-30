@@ -24,7 +24,7 @@ export default function GanttChart() {
       setData(result);
       
       const priorities = {};
-      result.projects?.forEach(p => {
+      result.priorities?.forEach(p => {
         priorities[p.id] = true;
       });
       setExpandedPriorities(priorities);
@@ -127,9 +127,9 @@ export default function GanttChart() {
     const priorityIds = milestone.fields['Priority (from Projects)'] || [];
     
     priorityIds.forEach(priorityId => {
-      const priority = data.projects?.find(p => p.id === priorityId);
+      const priority = data.priorities?.find(p => p.id === priorityId);
       if (priority) {
-        const priorityName = priority.fields.Name || priority.fields.Priorities || 'Uncategorized';
+        const priorityName = priority.fields.Priority || priority.fields.Name || 'Uncategorized';
         if (!priorityGroups[priorityName]) {
           priorityGroups[priorityName] = [];
         }
@@ -146,6 +146,7 @@ export default function GanttChart() {
           <p className="mb-2"><strong>Milestones found:</strong> {data?.milestones?.length || 0}</p>
           <p className="mb-2"><strong>Actions found:</strong> {data?.actions?.length || 0}</p>
           <p className="mb-2"><strong>Projects found:</strong> {data?.projects?.length || 0}</p>
+          <p className="mb-2"><strong>Priorities found:</strong> {data?.priorities?.length || 0}</p>
           {data?.milestones?.[0] && (
             <div className="mt-4">
               <p className="font-bold">Sample milestone fields:</p>
@@ -154,11 +155,11 @@ export default function GanttChart() {
               </pre>
             </div>
           )}
-          {data?.projects?.[0] && (
+          {data?.priorities?.[0] && (
             <div className="mt-4">
-              <p className="font-bold">Sample project fields:</p>
+              <p className="font-bold">Sample priority fields:</p>
               <pre className="text-xs bg-white p-2 mt-2 overflow-auto">
-                {JSON.stringify(data.projects[0].fields, null, 2)}
+                {JSON.stringify(data.priorities[0].fields, null, 2)}
               </pre>
             </div>
           )}
