@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, X, Download } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download } from 'lucide-react';
 
 export default function GanttChart() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedMilestones, setExpandedMilestones] = useState({});
-  const [expandedPriorities, setExpandedPriorities] = useState({
-    p1: true, p2: true, p3: true, p4: true
-  });
-  const [selectedStaff, setSelectedStaff] = useState([]);
-  const [sortByDate, setSortByDate] = useState(false);
+  const [expandedPriorities, setExpandedPriorities] = useState({});
   const [showAllActions, setShowAllActions] = useState(false);
 
   useEffect(() => {
@@ -22,36 +18,52 @@ export default function GanttChart() {
       const response = await fetch('/api/airtable');
       if (!response.ok) throw new Error('Failed to fetch data');
       const result = await response.json();
+      
+      console.log('Fetched data:', result); // Debug
+      
       setData(result);
+      
+      // Auto-expand all priorities
+      const priorities = {};
+      result.projects?.forEach(p => {
+        priorities[p.id] = true;
+      });
+      setExpandedPriorities(priorities);
+      
       setLoading(false);
     } catch (err) {
+      console.error('Error:', err);
       setError(err.message);
       setLoading(false);
     }
   };
 
   const months = [
-    { label: 'Aug 25', value: 1 },
-    { label: 'Sep 25', value: 2 },
-    { label: 'Oct 25', value: 3 },
-    { label: 'Nov 25', value: 4 },
-    { label: 'Dec 25', value: 5 },
-    { label: 'Jan 26', value: 6 },
-    { label: 'Feb 26', value: 7 },
-    { label: 'Mar 26', value: 8 },
-    { label: 'Apr 26', value: 9 },
-    { label: 'May 26', value: 10 },
-    { label: 'Jun 26', value: 11 },
-    { label: 'Jul 26', value: 12 }
+    { label: 'Aug 25', value: 1, date: '2025-08' },
+    { label: 'Sep 25', value: 2, date: '2025-09' },
+    { label: 'Oct 25', value: 3, date: '2025-10' },
+    { label: 'Nov 25', value: 4, date: '2025-11' },
+    { label: 'Dec 25', value: 5, date: '2025-12' },
+    { label: 'Jan 26', value: 6, date: '2026-01' },
+    { label: 'Feb 26', value: 7, date: '2026-02' },
+    { label: 'Mar 26', value: 8, date: '2026-03' },
+    { label: 'Apr 26', value: 9, date: '2026-04' },
+    { label: 'May 26', value: 10, date: '2026-05' },
+    { label: 'Jun 26', value: 11, date: '2026-06' },
+    { label: 'Jul 26', value: 12, date: '2026-07' }
   ];
 
   const dateToMonth = (dateString) => {
     if (!dateString) return null;
-    const date = new Date(dateString);
-    const baseDate = new Date('2025-08-01');
-    const diffMonths = (date.getFullYear() - baseDate.getFullYear()) * 12 + 
-                       (date.getMonth() - baseDate.getMonth());
-    return Math.max(1, Math.min(12, diffMonths + 1));
+    try {
+      const date = new Date(dateString);
+      const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthObj = months.find(m => m.date === yearMonth);
+      return monthObj ? monthObj.value : null;
+    } catch (e) {
+      console.error('Date parse error:', dateString, e);
+      return null;
+    }
   };
 
   const toggleMilestone = (milestoneId) => {
@@ -76,6 +88,7 @@ export default function GanttChart() {
   };
 
   const getBarStyle = (start, end) => {
+    if (!start || !end) return { display: 'none' };
     const width = (end - start + 1) * 8.33;
     const left = ((start - 1) * 8.33);
     return { left: `${left}%`, width: `${width}%` };
@@ -83,28 +96,42 @@ export default function GanttChart() {
 
   if (loading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading Gantt chart from Airtable...</div>
+      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-xl text-gray-600 mb-2">Loading Gantt chart from Airtable...</div>
+          <div className="text-sm text-gray-500">Fetching milestones and actions</div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="w-full h-screen flex items-center justify-center">
-        <div className="text-xl text-red-600">Error: {error}</div>
+      <div className="w-full h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="text-xl text-red-600 mb-2">Error loading data</div>
+          <div className="text-sm text-gray-600">{error}</div>
+          <button 
+            onClick={fetchData}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   // Group milestones by priority
   const priorityGroups = {};
-  data?.milestones.forEach(milestone => {
+  
+  data?.milestones?.forEach(milestone => {
     const priorityIds = milestone.fields['Priority (from Projects)'] || [];
+    
     priorityIds.forEach(priorityId => {
-      const priority = data.projects.find(p => p.id === priorityId);
+      const priority = data.projects?.find(p => p.id === priorityId);
       if (priority) {
-        const priorityName = priority.fields.Name;
+        const priorityName = priority.fields.Name || priority.fields.Priorities || 'Uncategorized';
         if (!priorityGroups[priorityName]) {
           priorityGroups[priorityName] = [];
         }
@@ -113,6 +140,28 @@ export default function GanttChart() {
     });
   });
 
+  // Show debug info if no milestones
+  if (Object.keys(priorityGroups).length === 0) {
+    return (
+      <div className="w-full p-6">
+        <h1 className="text-2xl font-bold mb-4">Debug Information</h1>
+        <div className="bg-gray-100 p-4 rounded">
+          <p className="mb-2"><strong>Milestones found:</strong> {data?.milestones?.length || 0}</p>
+          <p className="mb-2"><strong>Actions found:</strong> {data?.actions?.length || 0}</p>
+          <p className="mb-2"><strong>Projects found:</strong> {data?.projects?.length || 0}</p>
+          {data?.milestones?.[0] && (
+            <div className="mt-4">
+              <p className="font-bold">Sample milestone fields:</p>
+              <pre className="text-xs bg-white p-2 mt-2 overflow-auto">
+                {JSON.stringify(data.milestones[0].fields, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full bg-white p-6 overflow-x-auto">
       <div className="mb-6 flex items-center justify-between">
@@ -120,7 +169,12 @@ export default function GanttChart() {
           <h1 className="text-2xl font-bold text-gray-800 mb-2">
             TPW North-East & Cumbria Regional Delivery Action Plan
           </h1>
-          <p className="text-sm text-gray-600">August 2025 - July 2026 (Year 1) - Live from Airtable</p>
+          <p className="text-sm text-gray-600">
+            August 2025 - July 2026 (Year 1) - Live from Airtable
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {data?.milestones?.length || 0} milestones, {data?.actions?.length || 0} actions
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -146,7 +200,7 @@ export default function GanttChart() {
       <div className="min-w-[1200px]">
         {/* Header */}
         <div className="flex mb-4">
-          <div className="w-80 px-4 py-2 flex items-center justify-between">
+          <div className="w-80 px-4 py-2">
             <span className="font-semibold text-gray-700">Activity</span>
           </div>
           <div className="flex-1 flex">
@@ -171,27 +225,36 @@ export default function GanttChart() {
                 <ChevronRight className="w-5 h-5 mr-2" />
               }
               <span className="font-bold text-gray-800">{priorityName}</span>
+              <span className="ml-2 text-sm text-gray-600">({milestones.length})</span>
             </div>
 
             {/* Milestones */}
             {expandedPriorities[priorityName] && milestones.map((milestone) => {
               const actionIds = milestone.fields.Actions || [];
-              const milestoneActions = data.actions.filter(a => actionIds.includes(a.id));
+              const milestoneActions = data.actions?.filter(a => actionIds.includes(a.id)) || [];
               const isExpanded = expandedMilestones[milestone.id];
               
-              // Calculate milestone start from earliest action
-              let milestoneStart = dateToMonth(milestone.fields.Deadline);
-              let milestoneEnd = milestoneStart;
+              // Get dates
+              const deadline = dateToMonth(milestone.fields.Deadline);
+              const expectedDeadline = dateToMonth(milestone.fields['Expected Completion Date']);
+              
+              // Calculate milestone span from actions
+              let milestoneStart = deadline;
+              let milestoneEnd = deadline;
               
               if (milestoneActions.length > 0) {
-                const actionStarts = milestoneActions.map(a => dateToMonth(a.fields['Start date'])).filter(Boolean);
-                const actionEnds = milestoneActions.map(a => dateToMonth(a.fields['End date'])).filter(Boolean);
+                const actionStarts = milestoneActions
+                  .map(a => dateToMonth(a.fields['Start date']))
+                  .filter(Boolean);
+                const actionEnds = milestoneActions
+                  .map(a => dateToMonth(a.fields['End date']))
+                  .filter(Boolean);
+                
                 if (actionStarts.length > 0) milestoneStart = Math.min(...actionStarts);
-                if (actionEnds.length > 0) milestoneEnd = Math.max(...actionEnds, milestoneEnd);
+                if (actionEnds.length > 0) milestoneEnd = Math.max(...actionEnds, milestoneEnd || 0);
               }
 
-              const expectedDeadline = milestone.fields['Expected deadline'];
-              const isAtRisk = expectedDeadline && dateToMonth(expectedDeadline) > dateToMonth(milestone.fields.Deadline);
+              const isAtRisk = expectedDeadline && deadline && expectedDeadline > deadline;
 
               return (
                 <div key={milestone.id}>
@@ -199,26 +262,39 @@ export default function GanttChart() {
                   <div className="flex items-center border-b border-gray-100 hover:bg-gray-50">
                     <div className="w-80 px-4 py-3 text-sm text-gray-700 flex items-center gap-2">
                       {milestoneActions.length > 0 && (
-                        <button onClick={() => toggleMilestone(milestone.id)} className="text-gray-500 hover:text-gray-700">
-                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        <button 
+                          onClick={() => toggleMilestone(milestone.id)} 
+                          className="text-gray-500 hover:text-gray-700 flex-shrink-0"
+                        >
+                          {isExpanded ? 
+                            <ChevronDown className="w-4 h-4" /> : 
+                            <ChevronRight className="w-4 h-4" />
+                          }
                         </button>
                       )}
                       <span className="font-medium">{milestone.fields.Name}</span>
-                      {isAtRisk && <span className="text-xs text-red-600 font-semibold">⚠ At Risk</span>}
+                      {milestoneActions.length > 0 && (
+                        <span className="text-xs text-gray-500">({milestoneActions.length})</span>
+                      )}
+                      {isAtRisk && (
+                        <span className="text-xs text-red-600 font-semibold">⚠ At Risk</span>
+                      )}
                     </div>
                     <div className="flex-1 relative h-12">
+                      {/* Month grid */}
                       <div className="absolute inset-0 flex">
                         {months.map((_, i) => (
                           <div key={i} className="flex-1 border-l border-gray-200"></div>
                         ))}
                       </div>
+                      {/* Milestone bar */}
                       {milestoneStart && milestoneEnd && (
                         <div
                           className={`absolute top-2 h-8 ${isAtRisk ? 'bg-red-500' : 'bg-blue-600'} rounded shadow-sm flex items-center justify-center transition-all hover:shadow-md opacity-90`}
                           style={getBarStyle(milestoneStart, milestoneEnd)}
                         >
                           <span className="text-xs text-white font-medium px-2 truncate">
-                            {months[milestoneStart - 1].label} - {months[milestoneEnd - 1].label}
+                            {months[milestoneStart - 1]?.label} - {months[milestoneEnd - 1]?.label}
                           </span>
                         </div>
                       )}
@@ -230,30 +306,34 @@ export default function GanttChart() {
                     const actionStart = dateToMonth(action.fields['Start date']);
                     const actionEnd = dateToMonth(action.fields['End date']);
                     const status = action.fields.Status || 'Not Started';
-                    const statusColor = status === 'Complete' ? 'bg-green-500' : 
-                                       status === 'In Progress' ? 'bg-yellow-500' : 'bg-gray-400';
+                    const statusColor = 
+                      status === 'Done' || status === 'Complete' ? 'bg-green-500' : 
+                      status === 'In progress' ? 'bg-yellow-500' : 
+                      'bg-gray-400';
 
                     return (
                       <div key={action.id} className="flex items-center border-b border-gray-50 bg-gray-50">
-                        <div className="w-80 px-4 py-2 text-xs text-gray-600 pl-16">
-                          ↳ {action.fields.Name}
-                          <span className={`ml-2 px-2 py-0.5 rounded text-white ${statusColor}`}>
+                        <div className="w-80 px-4 py-2 text-xs text-gray-600 pl-16 flex items-center gap-2">
+                          <span>↳ {action.fields.Name}</span>
+                          <span className={`px-2 py-0.5 rounded text-white ${statusColor} text-xs`}>
                             {status}
                           </span>
                         </div>
                         <div className="flex-1 relative h-10">
+                          {/* Month grid */}
                           <div className="absolute inset-0 flex">
                             {months.map((_, i) => (
                               <div key={i} className="flex-1 border-l border-gray-200"></div>
                             ))}
                           </div>
+                          {/* Action bar */}
                           {actionStart && actionEnd && (
                             <div
                               className={`absolute top-1 h-6 ${statusColor} rounded shadow-sm flex items-center justify-center opacity-80`}
                               style={getBarStyle(actionStart, actionEnd)}
                             >
                               <span className="text-xs text-white font-medium px-2 truncate">
-                                {months[actionStart - 1].label} - {months[actionEnd - 1].label}
+                                {months[actionStart - 1]?.label} - {months[actionEnd - 1]?.label}
                               </span>
                             </div>
                           )}
