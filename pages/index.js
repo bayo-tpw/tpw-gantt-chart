@@ -118,23 +118,28 @@ export default function GanttChart() {
     );
   }
 
-  // Group milestones by priority using the Projects table
+  // Map priority IDs to names based on your Airtable
+  const priorityNameMap = {
+    'rec2WWPaWQHiJuvOo': '1. Governance and Leadership',
+    'recBiU2a1gpJCH3jn': '2. Grant programme',
+    'recdhbeustSwOr7VH': '4. Community Involvement and Engagement',
+    'recIKmZArvGuwMxBS': '3. Infrastructure Capability Support and Development',
+    'recw7DlH172o0BrlT': '5. Learning and impact'
+  };
+
+  // Group milestones by priority
   const priorityGroups = {};
   
   data?.milestones?.forEach(milestone => {
-    const projectIds = milestone.fields.Projects || [];
+    const priorityIds = milestone.fields['Priority (from Projects)'] || [];
     
-    projectIds.forEach(projectId => {
-      const project = data.projects?.find(p => p.id === projectId);
-      if (project && project.fields.Priorities && project.fields.Priorities.length > 0) {
-        // Use the first priority name from the Priorities field
-        const priorityName = project.fields.Priorities[0];
-        if (!priorityGroups[priorityName]) {
-          priorityGroups[priorityName] = [];
-        }
-        if (!priorityGroups[priorityName].some(m => m.id === milestone.id)) {
-          priorityGroups[priorityName].push(milestone);
-        }
+    priorityIds.forEach(priorityId => {
+      const priorityName = priorityNameMap[priorityId] || 'Uncategorized';
+      if (!priorityGroups[priorityName]) {
+        priorityGroups[priorityName] = [];
+      }
+      if (!priorityGroups[priorityName].some(m => m.id === milestone.id)) {
+        priorityGroups[priorityName].push(milestone);
       }
     });
   });
@@ -146,7 +151,6 @@ export default function GanttChart() {
         <div className="bg-gray-100 p-4 rounded">
           <p className="mb-2">Unable to group milestones by priority.</p>
           <p className="mb-2"><strong>Milestones:</strong> {data?.milestones?.length || 0}</p>
-          <p className="mb-2"><strong>Projects:</strong> {data?.projects?.length || 0}</p>
           <button 
             onClick={fetchData}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
