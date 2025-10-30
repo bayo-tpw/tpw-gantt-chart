@@ -7,8 +7,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch all data
-    const [milestonesData, actionsData, projectsData] = await Promise.all([
+    // Fetch all data including Priorities table
+    const [milestonesData, actionsData, projectsData, prioritiesData] = await Promise.all([
       fetch(`https://api.airtable.com/v0/${BASE_ID}/Milestones`, {
         headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
       }).then(r => r.json()),
@@ -19,14 +19,18 @@ export default async function handler(req, res) {
       
       fetch(`https://api.airtable.com/v0/${BASE_ID}/Projects`, {
         headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
+      }).then(r => r.json()),
+      
+      fetch(`https://api.airtable.com/v0/${BASE_ID}/Priorities`, {
+        headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
       }).then(r => r.json())
     ]);
 
-    // Process the data to match Gantt chart format
     const processedData = {
       milestones: milestonesData.records || [],
       actions: actionsData.records || [],
-      projects: projectsData.records || []
+      projects: projectsData.records || [],
+      priorities: prioritiesData.records || []
     };
 
     res.status(200).json(processedData);
