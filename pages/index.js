@@ -7,12 +7,20 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [groupByPriority, setGroupByPriority] = useState(true);
   const [sortByDeadline, setSortByDeadline] = useState(false);
+  const [selectedPriorities, setSelectedPriorities] = useState(new Set());
 
   useEffect(() => {
     fetch('/api/airtable')
       .then(res => res.json())
       .then(data => {
         setMilestones(data.milestones || []);
+        // Initialize all priorities as selected
+        const allPriorities = new Set(
+          (data.milestones || [])
+            .map(m => m.fields.Priority?.[0])
+            .filter(Boolean)
+        );
+        setSelectedPriorities(allPriorities);
         setLoading(false);
       })
       .catch(err => {
@@ -60,7 +68,9 @@ export default function Home() {
       end: deadlineDate,
       deadline
     };
-  }).filter(item => item.deadline); // Only show items with deadlines
+  })
+  .filter(item => item.deadline) // Only show items with deadlines
+  .filter(item => selectedPriorities.has(item.priority)); // Only show selected priorities
 
   // Sort by deadline if enabled
   let sortedData = [...chartData];
@@ -69,15 +79,36 @@ export default function Home() {
   }
 
   // Group by priority
-  const priorities = [...new Set(chartData.map(item => item.priority))].sort();
+  const priorities = [...new Set(milestones.map(m => m.fields.Priority?.[0]).filter(Boolean))].sort();
 
   // Organize data by priority if grouping is enabled
   const organizedData = groupByPriority
-    ? priorities.map(priority => ({
-        priority,
-        items: sortedData.filter(item => item.priority === priority)
-      })).filter(group => group.items.length > 0)
+    ? priorities
+        .filter(priority => selectedPriorities.has(priority)) // Only include selected priorities
+        .map(priority => ({
+          priority,
+          items: sortedData.filter(item => item.priority === priority)
+        }))
+        .filter(group => group.items.length > 0)
     : [{ priority: null, items: sortedData }];
+
+  const togglePriority = (priority) => {
+    const newSelected = new Set(selectedPriorities);
+    if (newSelected.has(priority)) {
+      newSelected.delete(priority);
+    } else {
+      newSelected.add(priority);
+    }
+    setSelectedPriorities(newSelected);
+  };
+
+  const selectAllPriorities = () => {
+    setSelectedPriorities(new Set(priorities));
+  };
+
+  const deselectAllPriorities = () => {
+    setSelectedPriorities(new Set());
+  };
 
   // Color mapping for priorities
   const priorityColors = {
@@ -132,27 +163,104 @@ export default function Home() {
             North-East & Cumbria Regional Delivery | August 2025 - July 2026
           </p>
 
-          {/* Legend */}
+          {/* Priority Filter (Interactive Legend) */}
           <div style={{ 
-            display: 'flex', 
-            gap: '20px', 
-            marginBottom: '20px',
             padding: '15px',
             backgroundColor: 'white',
             borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            marginBottom: '20px'
           }}>
-            {priorities.map(priority => (
-              <div key={priority} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ 
-                  width: '16px', 
-                  height: '16px', 
-                  backgroundColor: priorityColors[priority] || '#94a3b8',
-                  borderRadius: '3px'
-                }} />
-                <span style={{ fontSize: '14px', color: '#475569' }}>{priority}</span>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '12px'
+            }}>
+              <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                Filter by Priority Area:
+              </span>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={selectAllPriorities}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={deselectAllPriorities}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Clear All
+                </button>
               </div>
-            ))}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              {priorities.map(priority => {
+                const isSelected = selectedPriorities.has(priority);
+                return (
+                  <label 
+                    key={priority} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      cursor: 'pointer',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      borderColor: isSelected ? priorityColors[priority] || '#94a3b8' : '#e2e8f0',
+                      backgroundColor: isSelected ? `${priorityColors[priority] || '#94a3b8'}10` : 'white',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => togglePriority(priority)}
+                      style={{ 
+                        width: '16px', 
+                        height: '16px',
+                        cursor: 'pointer',
+                        accentColor: priorityColors[priority] || '#94a3b8'
+                      }}
+                    />
+                    <div style={{ 
+                      width: '12px', 
+                      height: '12px', 
+                      backgroundColor: priorityColors[priority] || '#94a3b8',
+                      borderRadius: '2px',
+                      opacity: isSelected ? 1 : 0.3
+                    }} />
+                    <span style={{ 
+                      fontSize: '14px', 
+                      color: isSelected ? '#1e293b' : '#94a3b8',
+                      fontWeight: isSelected ? '500' : '400'
+                    }}>
+                      {priority}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           {/* Filter Controls */}
@@ -354,13 +462,13 @@ export default function Home() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
             }}>
               <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                Total Milestones
+                Total Milestones {selectedPriorities.size < priorities.length ? '(Filtered)' : ''}
               </div>
               <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
                 {chartData.length}
               </div>
             </div>
-            {priorities.map(priority => {
+            {priorities.filter(p => selectedPriorities.has(p)).map(priority => {
               const count = chartData.filter(item => item.priority === priority).length;
               return (
                 <div key={priority} style={{ 
