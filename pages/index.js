@@ -5,6 +5,8 @@ export default function Home() {
   const [milestones, setMilestones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [groupByPriority, setGroupByPriority] = useState(true);
+  const [sortByDeadline, setSortByDeadline] = useState(false);
 
   useEffect(() => {
     fetch('/api/airtable')
@@ -60,8 +62,22 @@ export default function Home() {
     };
   }).filter(item => item.deadline); // Only show items with deadlines
 
+  // Sort by deadline if enabled
+  let sortedData = [...chartData];
+  if (sortByDeadline) {
+    sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+  }
+
   // Group by priority
   const priorities = [...new Set(chartData.map(item => item.priority))].sort();
+
+  // Organize data by priority if grouping is enabled
+  const organizedData = groupByPriority
+    ? priorities.map(priority => ({
+        priority,
+        items: sortedData.filter(item => item.priority === priority)
+      })).filter(group => group.items.length > 0)
+    : [{ priority: null, items: sortedData }];
 
   // Color mapping for priorities
   const priorityColors = {
@@ -139,6 +155,42 @@ export default function Home() {
             ))}
           </div>
 
+          {/* Filter Controls */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '15px', 
+            marginBottom: '20px',
+            padding: '15px',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontWeight: '600', color: '#1e293b', marginRight: '10px' }}>
+              View Options:
+            </span>
+            
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={groupByPriority}
+                onChange={(e) => setGroupByPriority(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '14px', color: '#475569' }}>Group by Priority</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={sortByDeadline}
+                onChange={(e) => setSortByDeadline(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '14px', color: '#475569' }}>Sort by Deadline</span>
+            </label>
+          </div>
+
           {/* Gantt Chart */}
           <div style={{ 
             backgroundColor: 'white',
@@ -182,78 +234,108 @@ export default function Home() {
             </div>
 
             {/* Gantt Rows */}
-            {chartData.map((item, idx) => (
-              <div 
-                key={item.id}
-                style={{ 
-                  display: 'flex',
-                  borderBottom: idx < chartData.length - 1 ? '1px solid #e2e8f0' : 'none',
-                  minHeight: '60px',
-                  alignItems: 'center',
-                  backgroundColor: idx % 2 === 0 ? 'white' : '#fafbfc'
-                }}
-              >
-                <div style={{ 
-                  width: '300px', 
-                  padding: '12px 16px',
-                  borderRight: '1px solid #e2e8f0',
-                  fontSize: '14px',
-                  color: '#334155',
-                  lineHeight: '1.4'
-                }}>
-                  <div style={{ fontWeight: '500', marginBottom: '4px' }}>
-                    {item.name}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {item.priority}
-                  </div>
-                </div>
-                <div style={{ flex: 1, position: 'relative', padding: '8px 0' }}>
-                  {/* Timeline grid */}
-                  <div style={{ 
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    display: 'flex'
-                  }}>
-                    {months.map((_, idx) => (
-                      <div 
-                        key={idx}
-                        style={{
-                          flex: 1,
-                          borderRight: idx < months.length - 1 ? '1px solid #f1f5f9' : 'none'
-                        }}
-                      />
-                    ))}
-                  </div>
-                  
-                  {/* Bar */}
+            {organizedData.map((group, groupIdx) => (
+              <div key={groupIdx}>
+                {/* Priority Header (only show if grouping is enabled) */}
+                {groupByPriority && (
                   <div style={{
-                    position: 'absolute',
-                    left: `${getPosition(item.start)}%`,
-                    width: `${getPosition(item.end) - getPosition(item.start)}%`,
-                    height: '32px',
-                    backgroundColor: priorityColors[item.priority] || '#94a3b8',
-                    borderRadius: '4px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    color: 'white',
-                    fontWeight: '500',
-                    padding: '0 8px',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    textOverflow: 'ellipsis'
+                    backgroundColor: '#f1f5f9',
+                    borderBottom: '2px solid #cbd5e1',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    color: '#334155',
+                    padding: '12px 16px',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10
                   }}>
-                    Due: {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    <div style={{ width: '300px', borderRight: '1px solid #cbd5e1' }}>
+                      {group.priority}
+                    </div>
+                    <div style={{ flex: 1, paddingLeft: '16px', color: '#64748b' }}>
+                      {group.items.length} milestone{group.items.length !== 1 ? 's' : ''}
+                    </div>
                   </div>
-                </div>
+                )}
+                
+                {/* Items in this group */}
+                {group.items.map((item, idx) => (
+                  <div 
+                    key={item.id}
+                    style={{ 
+                      display: 'flex',
+                      borderBottom: '1px solid #e2e8f0',
+                      minHeight: '60px',
+                      alignItems: 'center',
+                      backgroundColor: idx % 2 === 0 ? 'white' : '#fafbfc'
+                    }}
+                  >
+                    <div style={{ 
+                      width: '300px', 
+                      padding: '12px 16px',
+                      borderRight: '1px solid #e2e8f0',
+                      fontSize: '14px',
+                      color: '#334155',
+                      lineHeight: '1.4'
+                    }}>
+                      <div style={{ fontWeight: '500', marginBottom: '4px' }}>
+                        {item.name}
+                      </div>
+                      {!groupByPriority && (
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                          {item.priority}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, position: 'relative', padding: '8px 0' }}>
+                      {/* Timeline grid */}
+                      <div style={{ 
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: 'flex'
+                      }}>
+                        {months.map((_, idx) => (
+                          <div 
+                            key={idx}
+                            style={{
+                              flex: 1,
+                              borderRight: idx < months.length - 1 ? '1px solid #f1f5f9' : 'none'
+                            }}
+                          />
+                        ))}
+                      </div>
+                      
+                      {/* Bar */}
+                      <div style={{
+                        position: 'absolute',
+                        left: `${getPosition(item.start)}%`,
+                        width: `${getPosition(item.end) - getPosition(item.start)}%`,
+                        height: '32px',
+                        backgroundColor: priorityColors[item.priority] || '#94a3b8',
+                        borderRadius: '4px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        color: 'white',
+                        fontWeight: '500',
+                        padding: '0 8px',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        Due: {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
