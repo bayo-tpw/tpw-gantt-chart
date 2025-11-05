@@ -1,116 +1,31 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
-/**
- * ============================================================================
- * AIRTABLE DYNAMIC CONFIGURATION
- * ============================================================================
- * 
- * This Gantt chart uses DYNAMIC FIELD MAPPING from Airtable.
- * Field names are stored in a Config table in Airtable, so you can rename
- * fields without touching any code!
- * 
- * REQUIRED AIRTABLE STRUCTURE:
- * 
- * TABLE: Config
- * ----------------
- * This table tells the app which field names to use.
- * Required Records (Key | Value format):
- *   - milestone_name_field | Name (or your field name)
- *   - milestone_deadline_field | Deadline (or your field name)
- *   - milestone_priority_id_field | Priority area (or your field name)
- *   - milestone_priority_name_field | Priority (or your field name)
- *   - milestone_activities_field | Activities (or your field name)
- * 
- * To rename a field:
- * 1. Rename the field in your Milestones table
- * 2. Update the corresponding Value in the Config table
- * 3. Done! No code changes needed.
- * 
- * TABLE: Milestones
- * ----------------
- * Your main milestones/deliverables table.
- * Field names are defined in the Config table above.
- * 
- * TABLE: Priority Areas
- * --------------------
- * Contains your 4 priority areas. Colors are mapped by Record ID (stable).
- * DO NOT delete these records or the color mapping will break:
- *   - rec2WWPaWQHiJuvOo = 1. Governance and Leadership (Blue #3b82f6)
- *   - recBiU2a1gpJCH3jn = 2. Grant making (Green #10b981)
- *   - recIKmZArvGuwMxBS = 3. Capability support and development (Orange #f59e0b)
- *   - recw7DlH172o0BrlT = 4. Learning and Impact (Red #ef4444)
- * 
- * You can rename these priorities freely - colors are linked to IDs.
- */
-
-// PRIORITY COLOR MAPPING - Uses stable record IDs (safe from renames)
-const PRIORITY_COLORS = {
-  'rec2WWPaWQHiJuvOo': '#3b82f6', // 1. Governance and Leadership (blue)
-  'recBiU2a1gpJCH3jn': '#10b981', // 2. Grant making (green)
-  'recIKmZArvGuwMxBS': '#f59e0b', // 3. Capability support and development (orange)
-  'recw7DlH172o0BrlT': '#ef4444'  // 4. Learning and Impact (red)
-};
-
-/**
- * ============================================================================
- * END CONFIGURATION
- * ============================================================================
- */
-
 export default function Home() {
   const [milestones, setMilestones] = useState([]);
-  const [config, setConfig] = useState(null);
+  const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupByPriority, setGroupByPriority] = useState(true);
   const [sortByDeadline, setSortByDeadline] = useState(false);
   const [selectedPriorities, setSelectedPriorities] = useState(new Set());
-  const [selectedAccountable, setSelectedAccountable] = useState(new Set());
-  const [selectedStatuses, setSelectedStatuses] = useState(new Set());
+  const [activeTab, setActiveTab] = useState('gantt');
+  const [groupByResponsible, setGroupByResponsible] = useState(false);
+  const [sortActionsBy, setSortActionsBy] = useState('name');
 
   useEffect(() => {
     fetch('/api/airtable')
       .then(res => res.json())
       .then(data => {
-        if (data.error) {
-          throw new Error(data.message || data.error);
-        }
-        
-        setConfig(data.config);
         setMilestones(data.milestones || []);
-        
-        // Initialize all priorities as selected using IDs
-        const priorityIdField = data.config.milestone_priority_id_field;
-        const allPriorityIds = new Set(
+        setActions(data.actions || []);
+        // Initialize all priorities as selected
+        const allPriorities = new Set(
           (data.milestones || [])
-            .map(m => m.fields[priorityIdField]?.[0])
+            .map(m => m.fields.Priority?.[0])
             .filter(Boolean)
         );
-        setSelectedPriorities(allPriorityIds);
-        
-        // Initialize all accountable values as selected
-        const accountableField = data.config.milestone_accountable_field;
-        if (accountableField) {
-          const allAccountable = new Set(
-            (data.milestones || [])
-              .map(m => m.fields[accountableField])
-              .filter(Boolean)
-          );
-          setSelectedAccountable(allAccountable);
-        }
-        
-        // Initialize all status values as selected
-        const statusField = data.config.milestone_status_field;
-        if (statusField) {
-          const allStatuses = new Set(
-            (data.milestones || [])
-              .map(m => m.fields[statusField])
-              .filter(Boolean)
-          );
-          setSelectedStatuses(allStatuses);
-        }
-        
+        setSelectedPriorities(allPriorities);
         setLoading(false);
       })
       .catch(err => {
@@ -123,7 +38,7 @@ export default function Home() {
     return (
       <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'system-ui' }}>
         <h1>TPW Regional Delivery Action Plan</h1>
-        <p>Loading Gantt chart...</p>
+        <p>Loading data...</p>
       </div>
     );
   }
@@ -137,189 +52,79 @@ export default function Home() {
     );
   }
 
-  if (!config) {
-    return (
-      <div style={{ padding: '40px', fontFamily: 'system-ui' }}>
-        <h1>TPW Regional Delivery Action Plan</h1>
-        <p style={{ color: 'orange' }}>Configuration not loaded. Please ensure Config table exists in Airtable.</p>
-      </div>
-    );
-  }
-
-  // Process data for Gantt chart using dynamic field names from config
+  // Process milestones data for Gantt chart
   const chartData = milestones.map(milestone => {
-    const name = milestone.fields[config.milestone_name_field] || 'Unnamed Activity';
-    const deadline = milestone.fields[config.milestone_deadline_field] || '';
-    const startDateField = milestone.fields[config.milestone_start_field];
-    const priorityId = milestone.fields[config.milestone_priority_id_field]?.[0] || 'No Priority';
-    const priorityName = milestone.fields[config.milestone_priority_name_field]?.[0] || 'No Priority';
-    const accountable = milestone.fields[config.milestone_accountable_field] || 'Unassigned';
-    const status = milestone.fields[config.milestone_status_field] || 'No Status';
+    const name = milestone.fields.Name || 'Unnamed Activity';
+    const deadline = milestone.fields.Deadline || '';
+    const priority = milestone.fields.Priority?.[0] || 'No Priority';
     
-    // Parse deadline (format: YYYY-MM-DD)
     const deadlineDate = new Date(deadline);
-    
-    // Use actual start date if available, otherwise estimate (3 months before deadline)
-    let startDate;
-    if (startDateField) {
-      startDate = new Date(startDateField);
-    } else {
-      startDate = new Date(deadlineDate);
-      startDate.setMonth(startDate.getMonth() - 3);
-    }
+    const startDate = new Date(deadlineDate);
+    startDate.setMonth(startDate.getMonth() - 3);
     
     return {
       id: milestone.id,
       name,
-      priorityId,
-      priorityName,
-      accountable,
-      status,
+      priority,
       start: startDate,
       end: deadlineDate,
-      deadline,
-      hasActualStart: !!startDateField
+      deadline
     };
   })
-  .filter(item => item.deadline) // Only show items with deadlines
-  .filter(item => selectedPriorities.has(item.priorityId)) // Only show selected priorities
-  .filter(item => selectedAccountable.has(item.accountable)) // Only show selected accountable
-  .filter(item => selectedStatuses.has(item.status)); // Only show selected statuses
+  .filter(item => item.deadline)
+  .filter(item => selectedPriorities.has(item.priority));
 
-  // Sort by deadline if enabled
   let sortedData = [...chartData];
   if (sortByDeadline) {
     sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   }
 
-  // Create mapping of priority IDs to names using dynamic config
-  const priorityIdToName = {};
-  milestones.forEach(m => {
-    const id = m.fields[config.milestone_priority_id_field]?.[0];
-    const name = m.fields[config.milestone_priority_name_field]?.[0];
-    if (id && name) {
-      priorityIdToName[id] = name;
-    }
-  });
+  const priorities = [...new Set(milestones.map(m => m.fields.Priority?.[0]).filter(Boolean))].sort();
 
-  // Get all unique priority IDs and their names
-  const priorityIds = [...new Set(milestones.map(m => m.fields[config.milestone_priority_id_field]?.[0]).filter(Boolean))];
-  const priorities = priorityIds.map(id => ({
-    id,
-    name: priorityIdToName[id]
-  })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-  // Get all unique accountable values
-  const accountableValues = [...new Set(
-    milestones
-      .map(m => m.fields[config.milestone_accountable_field])
-      .filter(Boolean)
-  )].sort();
-
-  // Get all unique status values with custom sort order
-  const statusOrder = ['Not started', 'In progress', 'Complete', 'Blocked'];
-  const uniqueStatuses = [...new Set(
-    milestones
-      .map(m => m.fields[config.milestone_status_field])
-      .filter(Boolean)
-  )];
-  
-  // Sort by custom order, with any unknown statuses at the end
-  const statusValues = uniqueStatuses.sort((a, b) => {
-    const indexA = statusOrder.indexOf(a);
-    const indexB = statusOrder.indexOf(b);
-    
-    // If both are in the custom order, sort by that order
-    if (indexA !== -1 && indexB !== -1) {
-      return indexA - indexB;
-    }
-    // If only A is in custom order, it comes first
-    if (indexA !== -1) return -1;
-    // If only B is in custom order, it comes first
-    if (indexB !== -1) return 1;
-    // If neither is in custom order, sort alphabetically
-    return a.localeCompare(b);
-  });
-
-  // Use the PRIORITY_COLORS constant defined at the top
-
-  // Organize data by priority if grouping is enabled
   const organizedData = groupByPriority
     ? priorities
-        .filter(p => selectedPriorities.has(p.id)) // Only include selected priorities
-        .map(p => ({
-          priorityId: p.id,
-          priorityName: p.name,
-          items: sortedData.filter(item => item.priorityId === p.id)
+        .filter(priority => selectedPriorities.has(priority))
+        .map(priority => ({
+          priority,
+          items: sortedData.filter(item => item.priority === priority)
         }))
         .filter(group => group.items.length > 0)
-    : [{ priorityId: null, priorityName: null, items: sortedData }];
+    : [{ priority: null, items: sortedData }];
 
-  const togglePriority = (priorityId) => {
+  const togglePriority = (priority) => {
     const newSelected = new Set(selectedPriorities);
-    if (newSelected.has(priorityId)) {
-      newSelected.delete(priorityId);
+    if (newSelected.has(priority)) {
+      newSelected.delete(priority);
     } else {
-      newSelected.add(priorityId);
+      newSelected.add(priority);
     }
     setSelectedPriorities(newSelected);
   };
 
   const selectAllPriorities = () => {
-    setSelectedPriorities(new Set(priorities.map(p => p.id)));
+    setSelectedPriorities(new Set(priorities));
   };
 
   const deselectAllPriorities = () => {
     setSelectedPriorities(new Set());
   };
 
-  const toggleAccountable = (accountable) => {
-    const newSelected = new Set(selectedAccountable);
-    if (newSelected.has(accountable)) {
-      newSelected.delete(accountable);
-    } else {
-      newSelected.add(accountable);
-    }
-    setSelectedAccountable(newSelected);
+  const priorityColors = {
+    '1. Governance and Leadership': '#3b82f6',
+    '2. Grant making [national perspective approach for Year 1] ': '#10b981',
+    '3. Infrastructure capability support and development': '#f59e0b',
+    '4. Learning and Impact': '#ef4444'
   };
 
-  const selectAllAccountable = () => {
-    setSelectedAccountable(new Set(accountableValues));
-  };
-
-  const deselectAllAccountable = () => {
-    setSelectedAccountable(new Set());
-  };
-
-  const toggleStatus = (status) => {
-    const newSelected = new Set(selectedStatuses);
-    if (newSelected.has(status)) {
-      newSelected.delete(status);
-    } else {
-      newSelected.add(status);
-    }
-    setSelectedStatuses(newSelected);
-  };
-
-  const selectAllStatuses = () => {
-    setSelectedStatuses(new Set(statusValues));
-  };
-
-  const deselectAllStatuses = () => {
-    setSelectedStatuses(new Set());
-  };
-
-  // Calculate timeline bounds
+  // Calculate timeline bounds for Gantt
   const allDates = chartData.flatMap(item => [item.start, item.end]);
-  const minDate = new Date(Math.min(...allDates));
-  const maxDate = new Date(Math.max(...allDates));
+  const minDate = allDates.length > 0 ? new Date(Math.min(...allDates)) : new Date();
+  const maxDate = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date();
   
-  // Round to month boundaries
   minDate.setDate(1);
   maxDate.setMonth(maxDate.getMonth() + 1);
   maxDate.setDate(0);
 
-  // Generate month markers
   const months = [];
   let current = new Date(minDate);
   while (current <= maxDate) {
@@ -338,10 +143,50 @@ export default function Home() {
     return date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
   };
 
+  // Process actions data
+  const processedActions = actions.map(action => ({
+    id: action.id,
+    name: action.fields.Name || 'Unnamed Action',
+    responsible: action.fields.Responsible || 'Unassigned',
+    deadline: action.fields.Deadline || '',
+    status: action.fields.Status || 'No Status'
+  })).filter(action => action.name !== 'Unnamed Action');
+
+  // Sort actions
+  let sortedActions = [...processedActions];
+  if (sortActionsBy === 'name') {
+    sortedActions.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortActionsBy === 'deadline') {
+    sortedActions.sort((a, b) => {
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline) - new Date(b.deadline);
+    });
+  } else if (sortActionsBy === 'responsible') {
+    sortedActions.sort((a, b) => a.responsible.localeCompare(b.responsible));
+  } else if (sortActionsBy === 'status') {
+    sortedActions.sort((a, b) => a.status.localeCompare(b.status));
+  }
+
+  // Group actions by responsible if enabled
+  const organizedActions = groupByResponsible
+    ? [...new Set(sortedActions.map(a => a.responsible))]
+        .sort()
+        .map(responsible => ({
+          responsible,
+          items: sortedActions.filter(a => a.responsible === responsible)
+        }))
+    : [{ responsible: null, items: sortedActions }];
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
   return (
     <>
       <Head>
-        <title>TPW Regional Delivery Action Plan - Gantt Chart</title>
+        <title>TPW Regional Delivery Action Plan</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       
@@ -354,529 +199,549 @@ export default function Home() {
             North-East & Cumbria Regional Delivery | August 2025 - July 2026
           </p>
 
-          {/* Priority Filter (Interactive Legend) */}
+          {/* Tab Navigation */}
           <div style={{ 
-            padding: '15px',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            marginBottom: '20px'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '12px'
-            }}>
-              <span style={{ fontWeight: '600', color: '#1e293b' }}>
-                Filter by Priority Area:
-              </span>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={selectAllPriorities}
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: '12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: '500'
-                  }}
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllPriorities}
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: '12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: '500'
-                  }}
-                >
-                  Clear All
-                </button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-              {priorities.map(priority => {
-                const isSelected = selectedPriorities.has(priority.id);
-                return (
-                  <label 
-                    key={priority.id} 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      cursor: 'pointer',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      borderColor: isSelected ? PRIORITY_COLORS[priority.id] || '#94a3b8' : '#e2e8f0',
-                      backgroundColor: isSelected ? `${PRIORITY_COLORS[priority.id] || '#94a3b8'}10` : 'white',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => togglePriority(priority.id)}
-                      style={{ 
-                        width: '16px', 
-                        height: '16px',
-                        cursor: 'pointer',
-                        accentColor: PRIORITY_COLORS[priority.id] || '#94a3b8'
-                      }}
-                    />
-                    <div style={{ 
-                      width: '12px', 
-                      height: '12px', 
-                      backgroundColor: PRIORITY_COLORS[priority.id] || '#94a3b8',
-                      borderRadius: '2px',
-                      opacity: isSelected ? 1 : 0.3
-                    }} />
-                    <span style={{ 
-                      fontSize: '14px', 
-                      color: isSelected ? '#1e293b' : '#94a3b8',
-                      fontWeight: isSelected ? '500' : '400'
-                    }}>
-                      {priority.name}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Accountable Filter */}
-          <div style={{ 
-            padding: '15px',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            marginBottom: '20px'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '12px'
-            }}>
-              <span style={{ fontWeight: '600', color: '#1e293b' }}>
-                Filter by Accountable:
-              </span>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={selectAllAccountable}
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: '12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: '500'
-                  }}
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllAccountable}
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: '12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: '500'
-                  }}
-                >
-                  Clear All
-                </button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-              {accountableValues.map(accountable => {
-                const isSelected = selectedAccountable.has(accountable);
-                return (
-                  <label 
-                    key={accountable} 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      cursor: 'pointer',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      borderColor: isSelected ? '#6366f1' : '#e2e8f0',
-                      backgroundColor: isSelected ? '#eef2ff' : 'white',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleAccountable(accountable)}
-                      style={{ 
-                        width: '16px', 
-                        height: '16px',
-                        cursor: 'pointer',
-                        accentColor: '#6366f1'
-                      }}
-                    />
-                    <span style={{ 
-                      fontSize: '14px', 
-                      color: isSelected ? '#1e293b' : '#94a3b8',
-                      fontWeight: isSelected ? '500' : '400'
-                    }}>
-                      {accountable}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <div style={{ 
-            padding: '15px',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            marginBottom: '20px'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '12px'
-            }}>
-              <span style={{ fontWeight: '600', color: '#1e293b' }}>
-                Filter by Status:
-              </span>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={selectAllStatuses}
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: '12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: '500'
-                  }}
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAllStatuses}
-                  style={{
-                    padding: '4px 12px',
-                    fontSize: '12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: 'pointer',
-                    fontWeight: '500'
-                  }}
-                >
-                  Clear All
-                </button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-              {statusValues.map(status => {
-                const isSelected = selectedStatuses.has(status);
-                return (
-                  <label 
-                    key={status} 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      cursor: 'pointer',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      borderColor: isSelected ? '#10b981' : '#e2e8f0',
-                      backgroundColor: isSelected ? '#d1fae5' : 'white',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleStatus(status)}
-                      style={{ 
-                        width: '16px', 
-                        height: '16px',
-                        cursor: 'pointer',
-                        accentColor: '#10b981'
-                      }}
-                    />
-                    <span style={{ 
-                      fontSize: '14px', 
-                      color: isSelected ? '#1e293b' : '#94a3b8',
-                      fontWeight: isSelected ? '500' : '400'
-                    }}>
-                      {status}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Filter Controls */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '15px', 
+            display: 'flex',
+            gap: '10px',
             marginBottom: '20px',
-            padding: '15px',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            alignItems: 'center'
+            borderBottom: '2px solid #e2e8f0'
           }}>
-            <span style={{ fontWeight: '600', color: '#1e293b', marginRight: '10px' }}>
-              View Options:
-            </span>
-            
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input 
-                type="checkbox" 
-                checked={groupByPriority}
-                onChange={(e) => setGroupByPriority(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '14px', color: '#475569' }}>Group by Priority</span>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input 
-                type="checkbox" 
-                checked={sortByDeadline}
-                onChange={(e) => setSortByDeadline(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '14px', color: '#475569' }}>Sort by Deadline</span>
-            </label>
-          </div>
-
-          {/* Gantt Chart */}
-          <div style={{ 
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-          }}>
-            {/* Timeline Header */}
-            <div style={{ 
-              display: 'flex',
-              borderBottom: '2px solid #e2e8f0',
-              backgroundColor: '#f8fafc'
-            }}>
-              <div style={{ 
-                width: '300px', 
-                padding: '12px 16px',
+            <button
+              onClick={() => setActiveTab('gantt')}
+              style={{
+                padding: '12px 24px',
+                fontSize: '15px',
                 fontWeight: '600',
-                color: '#1e293b',
-                borderRight: '1px solid #e2e8f0'
-              }}>
-                Activity
-              </div>
-              <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
-                {months.map((month, idx) => (
-                  <div 
-                    key={idx}
-                    style={{
-                      flex: 1,
-                      padding: '12px 8px',
-                      textAlign: 'center',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      color: '#64748b',
-                      borderRight: idx < months.length - 1 ? '1px solid #e2e8f0' : 'none'
-                    }}
-                  >
-                    {formatMonth(month)}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Gantt Rows */}
-            {organizedData.map((group, groupIdx) => (
-              <div key={groupIdx}>
-                {/* Priority Header (only show if grouping is enabled) */}
-                {groupByPriority && (
-                  <div style={{
-                    display: 'flex',
-                    backgroundColor: '#f1f5f9',
-                    borderBottom: '2px solid #cbd5e1',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    color: '#334155',
-                    padding: '12px 16px',
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 10
-                  }}>
-                    <div style={{ width: '300px', borderRight: '1px solid #cbd5e1' }}>
-                      {group.priorityName}
-                    </div>
-                    <div style={{ flex: 1, paddingLeft: '16px', color: '#64748b' }}>
-                      {group.items.length} milestone{group.items.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Items in this group */}
-                {group.items.map((item, idx) => (
-                  <div 
-                    key={item.id}
-                    style={{ 
-                      display: 'flex',
-                      borderBottom: '1px solid #e2e8f0',
-                      minHeight: '60px',
-                      alignItems: 'center',
-                      backgroundColor: idx % 2 === 0 ? 'white' : '#fafbfc'
-                    }}
-                  >
-                    <div style={{ 
-                      width: '300px', 
-                      padding: '12px 16px',
-                      borderRight: '1px solid #e2e8f0',
-                      fontSize: '14px',
-                      color: '#334155',
-                      lineHeight: '1.4'
-                    }}>
-                      <div style={{ fontWeight: '500', marginBottom: '4px' }}>
-                        {item.name}
-                      </div>
-                      {!groupByPriority && (
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>
-                          {item.priorityName}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ flex: 1, position: 'relative', padding: '8px 0' }}>
-                      {/* Timeline grid */}
-                      <div style={{ 
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        display: 'flex'
-                      }}>
-                        {months.map((_, idx) => (
-                          <div 
-                            key={idx}
-                            style={{
-                              flex: 1,
-                              borderRight: idx < months.length - 1 ? '1px solid #f1f5f9' : 'none'
-                            }}
-                          />
-                        ))}
-                      </div>
-                      
-                      {/* Bar */}
-                      <div style={{
-                        position: 'absolute',
-                        left: `${getPosition(item.start)}%`,
-                        width: `${getPosition(item.end) - getPosition(item.start)}%`,
-                        height: '32px',
-                        backgroundColor: PRIORITY_COLORS[item.priorityId] || '#94a3b8',
-                        borderRadius: '4px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        color: 'white',
-                        fontWeight: '500',
-                        padding: '0 8px',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        textOverflow: 'ellipsis'
-                      }}>
-                        Due: {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
+                border: 'none',
+                borderBottom: activeTab === 'gantt' ? '3px solid #3b82f6' : '3px solid transparent',
+                backgroundColor: 'transparent',
+                color: activeTab === 'gantt' ? '#3b82f6' : '#64748b',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              Gantt Chart
+            </button>
+            <button
+              onClick={() => setActiveTab('actions')}
+              style={{
+                padding: '12px 24px',
+                fontSize: '15px',
+                fontWeight: '600',
+                border: 'none',
+                borderBottom: activeTab === 'actions' ? '3px solid #3b82f6' : '3px solid transparent',
+                backgroundColor: 'transparent',
+                color: activeTab === 'actions' ? '#3b82f6' : '#64748b',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              Actions
+            </button>
           </div>
 
-          {/* Summary Stats */}
-          <div style={{ 
-            marginTop: '30px',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '20px'
-          }}>
-            <div style={{ 
-              padding: '20px',
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}>
-              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                Total Milestones {selectedPriorities.size < priorities.length ? '(Filtered)' : ''}
+          {/* Gantt Chart Tab */}
+          {activeTab === 'gantt' && (
+            <>
+              {/* Priority Filter */}
+              <div style={{ 
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                marginBottom: '20px'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                    Filter by Priority Area:
+                  </span>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={selectAllPriorities}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAllPriorities}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {priorities.map(priority => {
+                    const isSelected = selectedPriorities.has(priority);
+                    return (
+                      <label 
+                        key={priority} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: isSelected ? priorityColors[priority] || '#94a3b8' : '#e2e8f0',
+                          backgroundColor: isSelected ? `${priorityColors[priority] || '#94a3b8'}10` : 'white',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => togglePriority(priority)}
+                          style={{ 
+                            width: '16px', 
+                            height: '16px',
+                            cursor: 'pointer',
+                            accentColor: priorityColors[priority] || '#94a3b8'
+                          }}
+                        />
+                        <div style={{ 
+                          width: '12px', 
+                          height: '12px', 
+                          backgroundColor: priorityColors[priority] || '#94a3b8',
+                          borderRadius: '2px',
+                          opacity: isSelected ? 1 : 0.3
+                        }} />
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: isSelected ? '#1e293b' : '#94a3b8',
+                          fontWeight: isSelected ? '500' : '400'
+                        }}>
+                          {priority}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
-                {chartData.length}
+
+              {/* View Options */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '15px', 
+                marginBottom: '20px',
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                alignItems: 'center'
+              }}>
+                <span style={{ fontWeight: '600', color: '#1e293b', marginRight: '10px' }}>
+                  View Options:
+                </span>
+                
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={groupByPriority}
+                    onChange={(e) => setGroupByPriority(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#475569' }}>Group by Priority</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={sortByDeadline}
+                    onChange={(e) => setSortByDeadline(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#475569' }}>Sort by Deadline</span>
+                </label>
               </div>
-            </div>
-            {priorities.filter(p => selectedPriorities.has(p.id)).map(priority => {
-              const count = chartData.filter(item => item.priorityId === priority.id).length;
-              return (
-                <div key={priority.id} style={{ 
+
+              {/* Gantt Chart */}
+              <div style={{ 
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                overflow: 'hidden'
+              }}>
+                {/* Timeline Header */}
+                <div style={{ 
+                  display: 'flex',
+                  borderBottom: '2px solid #e2e8f0',
+                  backgroundColor: '#f8fafc'
+                }}>
+                  <div style={{ 
+                    width: '300px', 
+                    padding: '12px 16px',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    borderRight: '1px solid #e2e8f0'
+                  }}>
+                    Activity
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', position: 'relative' }}>
+                    {months.map((month, idx) => (
+                      <div 
+                        key={idx}
+                        style={{
+                          flex: 1,
+                          padding: '12px 8px',
+                          textAlign: 'center',
+                          fontSize: '13px',
+                          fontWeight: '500',
+                          color: '#64748b',
+                          borderRight: idx < months.length - 1 ? '1px solid #e2e8f0' : 'none'
+                        }}
+                      >
+                        {formatMonth(month)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gantt Rows */}
+                {organizedData.map((group, groupIdx) => (
+                  <div key={groupIdx}>
+                    {groupByPriority && (
+                      <div style={{
+                        display: 'flex',
+                        backgroundColor: '#f1f5f9',
+                        borderBottom: '2px solid #cbd5e1',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        color: '#334155',
+                        padding: '12px 16px',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10
+                      }}>
+                        <div style={{ width: '300px', borderRight: '1px solid #cbd5e1' }}>
+                          {group.priority}
+                        </div>
+                        <div style={{ flex: 1, paddingLeft: '16px', color: '#64748b' }}>
+                          {group.items.length} milestone{group.items.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {group.items.map((item, idx) => (
+                      <div 
+                        key={item.id}
+                        style={{ 
+                          display: 'flex',
+                          borderBottom: '1px solid #e2e8f0',
+                          minHeight: '60px',
+                          alignItems: 'center',
+                          backgroundColor: idx % 2 === 0 ? 'white' : '#fafbfc'
+                        }}
+                      >
+                        <div style={{ 
+                          width: '300px', 
+                          padding: '12px 16px',
+                          borderRight: '1px solid #e2e8f0',
+                          fontSize: '14px',
+                          color: '#334155',
+                          lineHeight: '1.4'
+                        }}>
+                          <div style={{ fontWeight: '500', marginBottom: '4px' }}>
+                            {item.name}
+                          </div>
+                          {!groupByPriority && (
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>
+                              {item.priority}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ flex: 1, position: 'relative', padding: '8px 0' }}>
+                          <div style={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            display: 'flex'
+                          }}>
+                            {months.map((_, idx) => (
+                              <div 
+                                key={idx}
+                                style={{
+                                  flex: 1,
+                                  borderRight: idx < months.length - 1 ? '1px solid #f1f5f9' : 'none'
+                                }}
+                              />
+                            ))}
+                          </div>
+                          
+                          <div style={{
+                            position: 'absolute',
+                            left: `${getPosition(item.start)}%`,
+                            width: `${getPosition(item.end) - getPosition(item.start)}%`,
+                            height: '32px',
+                            backgroundColor: priorityColors[item.priority] || '#94a3b8',
+                            borderRadius: '4px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            color: 'white',
+                            fontWeight: '500',
+                            padding: '0 8px',
+                            overflow: 'hidden',
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            Due: {new Date(item.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              {/* Summary Stats */}
+              <div style={{ 
+                marginTop: '30px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '20px'
+              }}>
+                <div style={{ 
                   padding: '20px',
                   backgroundColor: 'white',
                   borderRadius: '8px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
                   <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                    {priority.name}
+                    Total Milestones {selectedPriorities.size < priorities.length ? '(Filtered)' : ''}
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: '700', color: PRIORITY_COLORS[priority.id] }}>
-                    {count}
+                  <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
+                    {chartData.length}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+                {priorities.filter(p => selectedPriorities.has(p)).map(priority => {
+                  const count = chartData.filter(item => item.priority === priority).length;
+                  return (
+                    <div key={priority} style={{ 
+                      padding: '20px',
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                      <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
+                        {priority}
+                      </div>
+                      <div style={{ fontSize: '32px', fontWeight: '700', color: priorityColors[priority] }}>
+                        {count}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-          <div style={{ 
-            marginTop: '20px',
-            padding: '15px',
-            backgroundColor: '#f0f9ff',
-            borderRadius: '8px',
-            fontSize: '14px',
-            color: '#0369a1'
-          }}>
-            <strong>Note:</strong> Milestones with Start dates show actual timelines. 
-            Milestones without Start dates are estimated as 3 months before their deadline for visualization.
-            Data synced from Airtable in real-time.
-          </div>
+              <div style={{ 
+                marginTop: '20px',
+                padding: '15px',
+                backgroundColor: '#f0f9ff',
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#0369a1'
+              }}>
+                <strong>Note:</strong> Start dates are estimated as 3 months before each deadline for visualization purposes.
+                Data synced from Airtable in real-time.
+              </div>
+            </>
+          )}
+
+          {/* Actions Tab */}
+          {activeTab === 'actions' && (
+            <>
+              {/* Actions Controls */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '15px', 
+                marginBottom: '20px',
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                alignItems: 'center',
+                flexWrap: 'wrap'
+              }}>
+                <span style={{ fontWeight: '600', color: '#1e293b', marginRight: '10px' }}>
+                  Sort by:
+                </span>
+                
+                <select
+                  value={sortActionsBy}
+                  onChange={(e) => setSortActionsBy(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="name">Name</option>
+                  <option value="deadline">Deadline</option>
+                  <option value="responsible">Responsible</option>
+                  <option value="status">Status</option>
+                </select>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginLeft: 'auto' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={groupByResponsible}
+                    onChange={(e) => setGroupByResponsible(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#475569' }}>Group by Responsible</span>
+                </label>
+              </div>
+
+              {/* Actions Table */}
+              <div style={{ 
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                overflow: 'hidden'
+              }}>
+                {/* Table Header */}
+                <div style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                  borderBottom: '2px solid #e2e8f0',
+                  backgroundColor: '#f8fafc',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  color: '#1e293b'
+                }}>
+                  <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0' }}>
+                    Name
+                  </div>
+                  <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0' }}>
+                    Responsible
+                  </div>
+                  <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0' }}>
+                    Deadline
+                  </div>
+                  <div style={{ padding: '12px 16px' }}>
+                    Status
+                  </div>
+                </div>
+
+                {/* Table Rows */}
+                {organizedActions.map((group, groupIdx) => (
+                  <div key={groupIdx}>
+                    {groupByResponsible && (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                        backgroundColor: '#f1f5f9',
+                        borderBottom: '2px solid #cbd5e1',
+                        fontWeight: '600',
+                        fontSize: '14px',
+                        color: '#334155',
+                        padding: '12px 16px'
+                      }}>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          {group.responsible} ({group.items.length} action{group.items.length !== 1 ? 's' : ''})
+                        </div>
+                      </div>
+                    )}
+                    
+                    {group.items.map((action, idx) => (
+                      <div 
+                        key={action.id}
+                        style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                          borderBottom: '1px solid #e2e8f0',
+                          backgroundColor: idx % 2 === 0 ? 'white' : '#fafbfc'
+                        }}
+                      >
+                        <div style={{ 
+                          padding: '12px 16px',
+                          borderRight: '1px solid #e2e8f0',
+                          fontSize: '14px',
+                          color: '#334155'
+                        }}>
+                          {action.name}
+                        </div>
+                        <div style={{ 
+                          padding: '12px 16px',
+                          borderRight: '1px solid #e2e8f0',
+                          fontSize: '14px',
+                          color: groupByResponsible ? '#64748b' : '#334155'
+                        }}>
+                          {groupByResponsible ? '' : action.responsible}
+                        </div>
+                        <div style={{ 
+                          padding: '12px 16px',
+                          borderRight: '1px solid #e2e8f0',
+                          fontSize: '14px',
+                          color: '#334155'
+                        }}>
+                          {formatDate(action.deadline)}
+                        </div>
+                        <div style={{ 
+                          padding: '12px 16px',
+                          fontSize: '14px',
+                          color: '#334155'
+                        }}>
+                          {action.status}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions Summary */}
+              <div style={{ 
+                marginTop: '20px',
+                padding: '20px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}>
+                <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
+                  Total Actions
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
+                  {processedActions.length}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>
