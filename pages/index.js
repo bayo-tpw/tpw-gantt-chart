@@ -66,6 +66,7 @@ export default function Home() {
   const [groupByPriority, setGroupByPriority] = useState(true);
   const [sortByDeadline, setSortByDeadline] = useState(false);
   const [selectedPriorities, setSelectedPriorities] = useState(new Set());
+  const [selectedAccountable, setSelectedAccountable] = useState(new Set());
 
   useEffect(() => {
     fetch('/api/airtable')
@@ -86,6 +87,18 @@ export default function Home() {
             .filter(Boolean)
         );
         setSelectedPriorities(allPriorityIds);
+        
+        // Initialize all accountable values as selected
+        const accountableField = data.config.milestone_accountable_field;
+        if (accountableField) {
+          const allAccountable = new Set(
+            (data.milestones || [])
+              .map(m => m.fields[accountableField])
+              .filter(Boolean)
+          );
+          setSelectedAccountable(allAccountable);
+        }
+        
         setLoading(false);
       })
       .catch(err => {
@@ -125,28 +138,38 @@ export default function Home() {
   const chartData = milestones.map(milestone => {
     const name = milestone.fields[config.milestone_name_field] || 'Unnamed Activity';
     const deadline = milestone.fields[config.milestone_deadline_field] || '';
+    const startDateField = milestone.fields[config.milestone_start_field];
     const priorityId = milestone.fields[config.milestone_priority_id_field]?.[0] || 'No Priority';
     const priorityName = milestone.fields[config.milestone_priority_name_field]?.[0] || 'No Priority';
+    const accountable = milestone.fields[config.milestone_accountable_field] || 'Unassigned';
     
     // Parse deadline (format: YYYY-MM-DD)
     const deadlineDate = new Date(deadline);
     
-    // Estimate start date (3 months before deadline for visualization)
-    const startDate = new Date(deadlineDate);
-    startDate.setMonth(startDate.getMonth() - 3);
+    // Use actual start date if available, otherwise estimate (3 months before deadline)
+    let startDate;
+    if (startDateField) {
+      startDate = new Date(startDateField);
+    } else {
+      startDate = new Date(deadlineDate);
+      startDate.setMonth(startDate.getMonth() - 3);
+    }
     
     return {
       id: milestone.id,
       name,
       priorityId,
       priorityName,
+      accountable,
       start: startDate,
       end: deadlineDate,
-      deadline
+      deadline,
+      hasActualStart: !!startDateField
     };
   })
   .filter(item => item.deadline) // Only show items with deadlines
-  .filter(item => selectedPriorities.has(item.priorityId)); // Only show selected priorities
+  .filter(item => selectedPriorities.has(item.priorityId)) // Only show selected priorities
+  .filter(item => selectedAccountable.has(item.accountable)); // Only show selected accountable
 
   // Sort by deadline if enabled
   let sortedData = [...chartData];
@@ -170,6 +193,13 @@ export default function Home() {
     id,
     name: priorityIdToName[id]
   })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  // Get all unique accountable values
+  const accountableValues = [...new Set(
+    milestones
+      .map(m => m.fields[config.milestone_accountable_field])
+      .filter(Boolean)
+  )].sort();
 
   // Use the PRIORITY_COLORS constant defined at the top
 
@@ -201,6 +231,24 @@ export default function Home() {
 
   const deselectAllPriorities = () => {
     setSelectedPriorities(new Set());
+  };
+
+  const toggleAccountable = (accountable) => {
+    const newSelected = new Set(selectedAccountable);
+    if (newSelected.has(accountable)) {
+      newSelected.delete(accountable);
+    } else {
+      newSelected.add(accountable);
+    }
+    setSelectedAccountable(newSelected);
+  };
+
+  const selectAllAccountable = () => {
+    setSelectedAccountable(new Set(accountableValues));
+  };
+
+  const deselectAllAccountable = () => {
+    setSelectedAccountable(new Set());
   };
 
   // Calculate timeline bounds
@@ -341,6 +389,99 @@ export default function Home() {
                       fontWeight: isSelected ? '500' : '400'
                     }}>
                       {priority.name}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Accountable Filter */}
+          <div style={{ 
+            padding: '15px',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            marginBottom: '20px'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '12px'
+            }}>
+              <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                Filter by Accountable:
+              </span>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={selectAllAccountable}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={deselectAllAccountable}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              {accountableValues.map(accountable => {
+                const isSelected = selectedAccountable.has(accountable);
+                return (
+                  <label 
+                    key={accountable} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      cursor: 'pointer',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      borderColor: isSelected ? '#6366f1' : '#e2e8f0',
+                      backgroundColor: isSelected ? '#eef2ff' : 'white',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleAccountable(accountable)}
+                      style={{ 
+                        width: '16px', 
+                        height: '16px',
+                        cursor: 'pointer',
+                        accentColor: '#6366f1'
+                      }}
+                    />
+                    <span style={{ 
+                      fontSize: '14px', 
+                      color: isSelected ? '#1e293b' : '#94a3b8',
+                      fontWeight: isSelected ? '500' : '400'
+                    }}>
+                      {accountable}
                     </span>
                   </label>
                 );
@@ -581,7 +722,8 @@ export default function Home() {
             fontSize: '14px',
             color: '#0369a1'
           }}>
-            <strong>Note:</strong> Start dates are estimated as 3 months before each deadline for visualization purposes.
+            <strong>Note:</strong> Milestones with Start dates show actual timelines. 
+            Milestones without Start dates are estimated as 3 months before their deadline for visualization.
             Data synced from Airtable in real-time.
           </div>
         </div>
