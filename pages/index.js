@@ -122,8 +122,11 @@ export default function Home() {
   const MILESTONE_NAME_FIELD = config.milestone_name_field || 'Name';
   const MILESTONE_DEADLINE_FIELD = config.milestone_deadline_field || 'Deadline';
   const MILESTONE_PRIORITY_ID_FIELD = config.milestone_priority_id_field || 'Priority area';
-  const MILESTONE_STATUS_FIELD = config.milestone_status_field || 'Status';
+  const MILESTONE_PRIORITY_NAME_FIELD = config.milestone_priority_name_field || 'Priority';
+  const MILESTONE_ACTIVITIES_FIELD = config.milestone_activities_field || 'Activities';
+  const MILESTONE_START_FIELD = config.milestone_start_field || 'Start Date';
   const MILESTONE_ACCOUNTABLE_FIELD = config.milestone_accountable_field || 'Accountable';
+  const MILESTONE_STATUS_FIELD = config.milestone_status_field || 'Status';
   
   const ACTION_NAME_FIELD = config.action_name_field || 'Name';
   const ACTION_RESPONSIBLE_FIELD = config.action_responsible_field || 'Responsible';
