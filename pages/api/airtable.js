@@ -7,8 +7,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch Milestones, Actions, and Staff (for responsible names)
-    const [milestonesData, actionsData, staffData] = await Promise.all([
+    // First, fetch the Config table to get field mappings
+    const configData = await fetch(`https://api.airtable.com/v0/${BASE_ID}/Config`, {
+      headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
+    }).then(r => r.json());
+
+    // Create config map from Key-Value pairs
+    const config = {};
+    (configData.records || []).forEach(record => {
+      const key = record.fields.Key;
+      const value = record.fields.Value;
+      if (key && value) {
+        config[key] = value;
+      }
+    });
+
+    // Fetch Milestones, Actions, People, and Priorities using config
+    const [milestonesData, actionsData, peopleData, prioritiesData] = await Promise.all([
       fetch(`https://api.airtable.com/v0/${BASE_ID}/Milestones`, {
         headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
       }).then(r => r.json()),
@@ -17,21 +32,32 @@ export default async function handler(req, res) {
         headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
       }).then(r => r.json()),
       
-      fetch(`https://api.airtable.com/v0/${BASE_ID}/Staff`, {
+      fetch(`https://api.airtable.com/v0/${BASE_ID}/People`, {
+        headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
+      }).then(r => r.json()),
+      
+      fetch(`https://api.airtable.com/v0/${BASE_ID}/Priorities`, {
         headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
       }).then(r => r.json())
     ]);
 
-    // Create a map of staff IDs to names
-    const staffMap = {};
-    (staffData.records || []).forEach(staff => {
-      staffMap[staff.id] = staff.fields.Name || 'Unknown';
+    // Create maps
+    const peopleMap = {};
+    (peopleData.records || []).forEach(person => {
+      peopleMap[person.id] = person.fields.Name || 'Unknown';
+    });
+
+    const prioritiesMap = {};
+    (prioritiesData.records || []).forEach(priority => {
+      prioritiesMap[priority.id] = priority.fields.Name || 'Unknown';
     });
 
     const processedData = {
+      config,
       milestones: milestonesData.records || [],
       actions: actionsData.records || [],
-      staffMap: staffMap
+      peopleMap,
+      prioritiesMap
     };
 
     res.status(200).json(processedData);
