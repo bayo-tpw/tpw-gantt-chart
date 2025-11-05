@@ -1,8 +1,66 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
+/**
+ * ============================================================================
+ * AIRTABLE DYNAMIC CONFIGURATION
+ * ============================================================================
+ * 
+ * This Gantt chart uses DYNAMIC FIELD MAPPING from Airtable.
+ * Field names are stored in a Config table in Airtable, so you can rename
+ * fields without touching any code!
+ * 
+ * REQUIRED AIRTABLE STRUCTURE:
+ * 
+ * TABLE: Config
+ * ----------------
+ * This table tells the app which field names to use.
+ * Required Records (Key | Value format):
+ *   - milestone_name_field | Name (or your field name)
+ *   - milestone_deadline_field | Deadline (or your field name)
+ *   - milestone_priority_id_field | Priority area (or your field name)
+ *   - milestone_priority_name_field | Priority (or your field name)
+ *   - milestone_activities_field | Activities (or your field name)
+ * 
+ * To rename a field:
+ * 1. Rename the field in your Milestones table
+ * 2. Update the corresponding Value in the Config table
+ * 3. Done! No code changes needed.
+ * 
+ * TABLE: Milestones
+ * ----------------
+ * Your main milestones/deliverables table.
+ * Field names are defined in the Config table above.
+ * 
+ * TABLE: Priority Areas
+ * --------------------
+ * Contains your 4 priority areas. Colors are mapped by Record ID (stable).
+ * DO NOT delete these records or the color mapping will break:
+ *   - rec2WWPaWQHiJuvOo = 1. Governance and Leadership (Blue #3b82f6)
+ *   - recBiU2a1gpJCH3jn = 2. Grant making (Green #10b981)
+ *   - recIKmZArvGuwMxBS = 3. Capability support and development (Orange #f59e0b)
+ *   - recw7DlH172o0BrlT = 4. Learning and Impact (Red #ef4444)
+ * 
+ * You can rename these priorities freely - colors are linked to IDs.
+ */
+
+// PRIORITY COLOR MAPPING - Uses stable record IDs (safe from renames)
+const PRIORITY_COLORS = {
+  'rec2WWPaWQHiJuvOo': '#3b82f6', // 1. Governance and Leadership (blue)
+  'recBiU2a1gpJCH3jn': '#10b981', // 2. Grant making (green)
+  'recIKmZArvGuwMxBS': '#f59e0b', // 3. Capability support and development (orange)
+  'recw7DlH172o0BrlT': '#ef4444'  // 4. Learning and Impact (red)
+};
+
+/**
+ * ============================================================================
+ * END CONFIGURATION
+ * ============================================================================
+ */
+
 export default function Home() {
   const [milestones, setMilestones] = useState([]);
+  const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupByPriority, setGroupByPriority] = useState(true);
@@ -13,11 +71,18 @@ export default function Home() {
     fetch('/api/airtable')
       .then(res => res.json())
       .then(data => {
+        if (data.error) {
+          throw new Error(data.message || data.error);
+        }
+        
+        setConfig(data.config);
         setMilestones(data.milestones || []);
+        
         // Initialize all priorities as selected using IDs
+        const priorityIdField = data.config.milestone_priority_id_field;
         const allPriorityIds = new Set(
           (data.milestones || [])
-            .map(m => m.fields['Priority area']?.[0])
+            .map(m => m.fields[priorityIdField]?.[0])
             .filter(Boolean)
         );
         setSelectedPriorities(allPriorityIds);
@@ -47,12 +112,21 @@ export default function Home() {
     );
   }
 
-  // Process data for Gantt chart
+  if (!config) {
+    return (
+      <div style={{ padding: '40px', fontFamily: 'system-ui' }}>
+        <h1>TPW Regional Delivery Action Plan</h1>
+        <p style={{ color: 'orange' }}>Configuration not loaded. Please ensure Config table exists in Airtable.</p>
+      </div>
+    );
+  }
+
+  // Process data for Gantt chart using dynamic field names from config
   const chartData = milestones.map(milestone => {
-    const name = milestone.fields.Name || 'Unnamed Activity';
-    const deadline = milestone.fields.Deadline || '';
-    const priorityId = milestone.fields['Priority area']?.[0] || 'No Priority';
-    const priorityName = milestone.fields.Priority?.[0] || 'No Priority';
+    const name = milestone.fields[config.milestone_name_field] || 'Unnamed Activity';
+    const deadline = milestone.fields[config.milestone_deadline_field] || '';
+    const priorityId = milestone.fields[config.milestone_priority_id_field]?.[0] || 'No Priority';
+    const priorityName = milestone.fields[config.milestone_priority_name_field]?.[0] || 'No Priority';
     
     // Parse deadline (format: YYYY-MM-DD)
     const deadlineDate = new Date(deadline);
@@ -80,30 +154,24 @@ export default function Home() {
     sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   }
 
-  // Create mapping of priority IDs to names
+  // Create mapping of priority IDs to names using dynamic config
   const priorityIdToName = {};
   milestones.forEach(m => {
-    const id = m.fields['Priority area']?.[0];
-    const name = m.fields.Priority?.[0];
+    const id = m.fields[config.milestone_priority_id_field]?.[0];
+    const name = m.fields[config.milestone_priority_name_field]?.[0];
     if (id && name) {
       priorityIdToName[id] = name;
     }
   });
 
   // Get all unique priority IDs and their names
-  const priorityIds = [...new Set(milestones.map(m => m.fields['Priority area']?.[0]).filter(Boolean))];
+  const priorityIds = [...new Set(milestones.map(m => m.fields[config.milestone_priority_id_field]?.[0]).filter(Boolean))];
   const priorities = priorityIds.map(id => ({
     id,
     name: priorityIdToName[id]
   })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-  // Color mapping for priorities using STABLE IDs
-  const priorityColors = {
-    'rec2WWPaWQHiJuvOo': '#3b82f6', // 1. Governance and Leadership (blue)
-    'recBiU2a1gpJCH3jn': '#10b981', // 2. Grant making (green)
-    'recIKmZArvGuwMxBS': '#f59e0b', // 3. Capability support and development (orange)
-    'recw7DlH172o0BrlT': '#ef4444'  // 4. Learning and Impact (red)
-  };
+  // Use the PRIORITY_COLORS constant defined at the top
 
   // Organize data by priority if grouping is enabled
   const organizedData = groupByPriority
@@ -133,14 +201,6 @@ export default function Home() {
 
   const deselectAllPriorities = () => {
     setSelectedPriorities(new Set());
-  };
-
-  // Color mapping for priorities
-  const priorityColors = {
-    '1. Governance and Leadership': '#3b82f6',
-    '2. Grant making': '#10b981',
-    '3. Capability support and development': '#f59e0b',
-    '4. Learning and Impact': '#ef4444'
   };
 
   // Calculate timeline bounds
@@ -252,8 +312,8 @@ export default function Home() {
                       padding: '8px 12px',
                       borderRadius: '6px',
                       border: '1px solid',
-                      borderColor: isSelected ? priorityColors[priority.id] || '#94a3b8' : '#e2e8f0',
-                      backgroundColor: isSelected ? `${priorityColors[priority.id] || '#94a3b8'}10` : 'white',
+                      borderColor: isSelected ? PRIORITY_COLORS[priority.id] || '#94a3b8' : '#e2e8f0',
+                      backgroundColor: isSelected ? `${PRIORITY_COLORS[priority.id] || '#94a3b8'}10` : 'white',
                       transition: 'all 0.2s'
                     }}
                   >
@@ -265,13 +325,13 @@ export default function Home() {
                         width: '16px', 
                         height: '16px',
                         cursor: 'pointer',
-                        accentColor: priorityColors[priority.id] || '#94a3b8'
+                        accentColor: PRIORITY_COLORS[priority.id] || '#94a3b8'
                       }}
                     />
                     <div style={{ 
                       width: '12px', 
                       height: '12px', 
-                      backgroundColor: priorityColors[priority.id] || '#94a3b8',
+                      backgroundColor: PRIORITY_COLORS[priority.id] || '#94a3b8',
                       borderRadius: '2px',
                       opacity: isSelected ? 1 : 0.3
                     }} />
@@ -448,7 +508,7 @@ export default function Home() {
                         left: `${getPosition(item.start)}%`,
                         width: `${getPosition(item.end) - getPosition(item.start)}%`,
                         height: '32px',
-                        backgroundColor: priorityColors[item.priorityId] || '#94a3b8',
+                        backgroundColor: PRIORITY_COLORS[item.priorityId] || '#94a3b8',
                         borderRadius: '4px',
                         top: '50%',
                         transform: 'translateY(-50%)',
@@ -505,7 +565,7 @@ export default function Home() {
                   <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
                     {priority.name}
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: '700', color: priorityColors[priority.id] }}>
+                  <div style={{ fontSize: '32px', fontWeight: '700', color: PRIORITY_COLORS[priority.id] }}>
                     {count}
                   </div>
                 </div>
