@@ -216,12 +216,30 @@ export default function Home() {
       .filter(Boolean)
   )].sort();
 
-  // Get all unique status values
-  const statusValues = [...new Set(
+  // Get all unique status values with custom sort order
+  const statusOrder = ['Not started', 'In progress', 'Complete', 'Blocked'];
+  const uniqueStatuses = [...new Set(
     milestones
       .map(m => m.fields[config.milestone_status_field])
       .filter(Boolean)
-  )].sort();
+  )];
+  
+  // Sort by custom order, with any unknown statuses at the end
+  const statusValues = uniqueStatuses.sort((a, b) => {
+    const indexA = statusOrder.indexOf(a);
+    const indexB = statusOrder.indexOf(b);
+    
+    // If both are in the custom order, sort by that order
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB;
+    }
+    // If only A is in custom order, it comes first
+    if (indexA !== -1) return -1;
+    // If only B is in custom order, it comes first
+    if (indexB !== -1) return 1;
+    // If neither is in custom order, sort alphabetically
+    return a.localeCompare(b);
+  });
 
   // Use the PRIORITY_COLORS constant defined at the top
 
