@@ -67,6 +67,7 @@ export default function Home() {
   const [sortByDeadline, setSortByDeadline] = useState(false);
   const [selectedPriorities, setSelectedPriorities] = useState(new Set());
   const [selectedAccountable, setSelectedAccountable] = useState(new Set());
+  const [selectedStatuses, setSelectedStatuses] = useState(new Set());
 
   useEffect(() => {
     fetch('/api/airtable')
@@ -97,6 +98,17 @@ export default function Home() {
               .filter(Boolean)
           );
           setSelectedAccountable(allAccountable);
+        }
+        
+        // Initialize all status values as selected
+        const statusField = data.config.milestone_status_field;
+        if (statusField) {
+          const allStatuses = new Set(
+            (data.milestones || [])
+              .map(m => m.fields[statusField])
+              .filter(Boolean)
+          );
+          setSelectedStatuses(allStatuses);
         }
         
         setLoading(false);
@@ -142,6 +154,7 @@ export default function Home() {
     const priorityId = milestone.fields[config.milestone_priority_id_field]?.[0] || 'No Priority';
     const priorityName = milestone.fields[config.milestone_priority_name_field]?.[0] || 'No Priority';
     const accountable = milestone.fields[config.milestone_accountable_field] || 'Unassigned';
+    const status = milestone.fields[config.milestone_status_field] || 'No Status';
     
     // Parse deadline (format: YYYY-MM-DD)
     const deadlineDate = new Date(deadline);
@@ -161,6 +174,7 @@ export default function Home() {
       priorityId,
       priorityName,
       accountable,
+      status,
       start: startDate,
       end: deadlineDate,
       deadline,
@@ -169,7 +183,8 @@ export default function Home() {
   })
   .filter(item => item.deadline) // Only show items with deadlines
   .filter(item => selectedPriorities.has(item.priorityId)) // Only show selected priorities
-  .filter(item => selectedAccountable.has(item.accountable)); // Only show selected accountable
+  .filter(item => selectedAccountable.has(item.accountable)) // Only show selected accountable
+  .filter(item => selectedStatuses.has(item.status)); // Only show selected statuses
 
   // Sort by deadline if enabled
   let sortedData = [...chartData];
@@ -198,6 +213,13 @@ export default function Home() {
   const accountableValues = [...new Set(
     milestones
       .map(m => m.fields[config.milestone_accountable_field])
+      .filter(Boolean)
+  )].sort();
+
+  // Get all unique status values
+  const statusValues = [...new Set(
+    milestones
+      .map(m => m.fields[config.milestone_status_field])
       .filter(Boolean)
   )].sort();
 
@@ -249,6 +271,24 @@ export default function Home() {
 
   const deselectAllAccountable = () => {
     setSelectedAccountable(new Set());
+  };
+
+  const toggleStatus = (status) => {
+    const newSelected = new Set(selectedStatuses);
+    if (newSelected.has(status)) {
+      newSelected.delete(status);
+    } else {
+      newSelected.add(status);
+    }
+    setSelectedStatuses(newSelected);
+  };
+
+  const selectAllStatuses = () => {
+    setSelectedStatuses(new Set(statusValues));
+  };
+
+  const deselectAllStatuses = () => {
+    setSelectedStatuses(new Set());
   };
 
   // Calculate timeline bounds
@@ -482,6 +522,99 @@ export default function Home() {
                       fontWeight: isSelected ? '500' : '400'
                     }}>
                       {accountable}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Status Filter */}
+          <div style={{ 
+            padding: '15px',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            marginBottom: '20px'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '12px'
+            }}>
+              <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                Filter by Status:
+              </span>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={selectAllStatuses}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={deselectAllStatuses}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              {statusValues.map(status => {
+                const isSelected = selectedStatuses.has(status);
+                return (
+                  <label 
+                    key={status} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      cursor: 'pointer',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      borderColor: isSelected ? '#10b981' : '#e2e8f0',
+                      backgroundColor: isSelected ? '#d1fae5' : 'white',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleStatus(status)}
+                      style={{ 
+                        width: '16px', 
+                        height: '16px',
+                        cursor: 'pointer',
+                        accentColor: '#10b981'
+                      }}
+                    />
+                    <span style={{ 
+                      fontSize: '14px', 
+                      color: isSelected ? '#1e293b' : '#94a3b8',
+                      fontWeight: isSelected ? '500' : '400'
+                    }}>
+                      {status}
                     </span>
                   </label>
                 );
