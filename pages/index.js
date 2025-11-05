@@ -14,13 +14,13 @@ export default function Home() {
       .then(res => res.json())
       .then(data => {
         setMilestones(data.milestones || []);
-        // Initialize all priorities as selected
-        const allPriorities = new Set(
+        // Initialize all priorities as selected using IDs
+        const allPriorityIds = new Set(
           (data.milestones || [])
-            .map(m => m.fields.Priority?.[0])
+            .map(m => m.fields['Priority area']?.[0])
             .filter(Boolean)
         );
-        setSelectedPriorities(allPriorities);
+        setSelectedPriorities(allPriorityIds);
         setLoading(false);
       })
       .catch(err => {
@@ -51,7 +51,8 @@ export default function Home() {
   const chartData = milestones.map(milestone => {
     const name = milestone.fields.Name || 'Unnamed Activity';
     const deadline = milestone.fields.Deadline || '';
-    const priority = milestone.fields.Priority?.[0] || 'No Priority';
+    const priorityId = milestone.fields['Priority area']?.[0] || 'No Priority';
+    const priorityName = milestone.fields.Priority?.[0] || 'No Priority';
     
     // Parse deadline (format: YYYY-MM-DD)
     const deadlineDate = new Date(deadline);
@@ -63,14 +64,15 @@ export default function Home() {
     return {
       id: milestone.id,
       name,
-      priority,
+      priorityId,
+      priorityName,
       start: startDate,
       end: deadlineDate,
       deadline
     };
   })
   .filter(item => item.deadline) // Only show items with deadlines
-  .filter(item => selectedPriorities.has(item.priority)); // Only show selected priorities
+  .filter(item => selectedPriorities.has(item.priorityId)); // Only show selected priorities
 
   // Sort by deadline if enabled
   let sortedData = [...chartData];
@@ -78,32 +80,55 @@ export default function Home() {
     sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   }
 
-  // Group by priority
-  const priorities = [...new Set(milestones.map(m => m.fields.Priority?.[0]).filter(Boolean))].sort();
+  // Create mapping of priority IDs to names
+  const priorityIdToName = {};
+  milestones.forEach(m => {
+    const id = m.fields['Priority area']?.[0];
+    const name = m.fields.Priority?.[0];
+    if (id && name) {
+      priorityIdToName[id] = name;
+    }
+  });
+
+  // Get all unique priority IDs and their names
+  const priorityIds = [...new Set(milestones.map(m => m.fields['Priority area']?.[0]).filter(Boolean))];
+  const priorities = priorityIds.map(id => ({
+    id,
+    name: priorityIdToName[id]
+  })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  // Color mapping for priorities using STABLE IDs
+  const priorityColors = {
+    'rec2WWPaWQHiJuvOo': '#3b82f6', // 1. Governance and Leadership (blue)
+    'recBiU2a1gpJCH3jn': '#10b981', // 2. Grant making (green)
+    'recIKmZArvGuwMxBS': '#f59e0b', // 3. Capability support and development (orange)
+    'recw7DlH172o0BrlT': '#ef4444'  // 4. Learning and Impact (red)
+  };
 
   // Organize data by priority if grouping is enabled
   const organizedData = groupByPriority
     ? priorities
-        .filter(priority => selectedPriorities.has(priority)) // Only include selected priorities
-        .map(priority => ({
-          priority,
-          items: sortedData.filter(item => item.priority === priority)
+        .filter(p => selectedPriorities.has(p.id)) // Only include selected priorities
+        .map(p => ({
+          priorityId: p.id,
+          priorityName: p.name,
+          items: sortedData.filter(item => item.priorityId === p.id)
         }))
         .filter(group => group.items.length > 0)
-    : [{ priority: null, items: sortedData }];
+    : [{ priorityId: null, priorityName: null, items: sortedData }];
 
-  const togglePriority = (priority) => {
+  const togglePriority = (priorityId) => {
     const newSelected = new Set(selectedPriorities);
-    if (newSelected.has(priority)) {
-      newSelected.delete(priority);
+    if (newSelected.has(priorityId)) {
+      newSelected.delete(priorityId);
     } else {
-      newSelected.add(priority);
+      newSelected.add(priorityId);
     }
     setSelectedPriorities(newSelected);
   };
 
   const selectAllPriorities = () => {
-    setSelectedPriorities(new Set(priorities));
+    setSelectedPriorities(new Set(priorities.map(p => p.id)));
   };
 
   const deselectAllPriorities = () => {
@@ -215,10 +240,10 @@ export default function Home() {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
               {priorities.map(priority => {
-                const isSelected = selectedPriorities.has(priority);
+                const isSelected = selectedPriorities.has(priority.id);
                 return (
                   <label 
-                    key={priority} 
+                    key={priority.id} 
                     style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -227,26 +252,26 @@ export default function Home() {
                       padding: '8px 12px',
                       borderRadius: '6px',
                       border: '1px solid',
-                      borderColor: isSelected ? priorityColors[priority] || '#94a3b8' : '#e2e8f0',
-                      backgroundColor: isSelected ? `${priorityColors[priority] || '#94a3b8'}10` : 'white',
+                      borderColor: isSelected ? priorityColors[priority.id] || '#94a3b8' : '#e2e8f0',
+                      backgroundColor: isSelected ? `${priorityColors[priority.id] || '#94a3b8'}10` : 'white',
                       transition: 'all 0.2s'
                     }}
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      onChange={() => togglePriority(priority)}
+                      onChange={() => togglePriority(priority.id)}
                       style={{ 
                         width: '16px', 
                         height: '16px',
                         cursor: 'pointer',
-                        accentColor: priorityColors[priority] || '#94a3b8'
+                        accentColor: priorityColors[priority.id] || '#94a3b8'
                       }}
                     />
                     <div style={{ 
                       width: '12px', 
                       height: '12px', 
-                      backgroundColor: priorityColors[priority] || '#94a3b8',
+                      backgroundColor: priorityColors[priority.id] || '#94a3b8',
                       borderRadius: '2px',
                       opacity: isSelected ? 1 : 0.3
                     }} />
@@ -255,7 +280,7 @@ export default function Home() {
                       color: isSelected ? '#1e293b' : '#94a3b8',
                       fontWeight: isSelected ? '500' : '400'
                     }}>
-                      {priority}
+                      {priority.name}
                     </span>
                   </label>
                 );
@@ -359,7 +384,7 @@ export default function Home() {
                     zIndex: 10
                   }}>
                     <div style={{ width: '300px', borderRight: '1px solid #cbd5e1' }}>
-                      {group.priority}
+                      {group.priorityName}
                     </div>
                     <div style={{ flex: 1, paddingLeft: '16px', color: '#64748b' }}>
                       {group.items.length} milestone{group.items.length !== 1 ? 's' : ''}
@@ -392,7 +417,7 @@ export default function Home() {
                       </div>
                       {!groupByPriority && (
                         <div style={{ fontSize: '12px', color: '#64748b' }}>
-                          {item.priority}
+                          {item.priorityName}
                         </div>
                       )}
                     </div>
@@ -423,7 +448,7 @@ export default function Home() {
                         left: `${getPosition(item.start)}%`,
                         width: `${getPosition(item.end) - getPosition(item.start)}%`,
                         height: '32px',
-                        backgroundColor: priorityColors[item.priority] || '#94a3b8',
+                        backgroundColor: priorityColors[item.priorityId] || '#94a3b8',
                         borderRadius: '4px',
                         top: '50%',
                         transform: 'translateY(-50%)',
@@ -468,19 +493,19 @@ export default function Home() {
                 {chartData.length}
               </div>
             </div>
-            {priorities.filter(p => selectedPriorities.has(p)).map(priority => {
-              const count = chartData.filter(item => item.priority === priority).length;
+            {priorities.filter(p => selectedPriorities.has(p.id)).map(priority => {
+              const count = chartData.filter(item => item.priorityId === priority.id).length;
               return (
-                <div key={priority} style={{ 
+                <div key={priority.id} style={{ 
                   padding: '20px',
                   backgroundColor: 'white',
                   borderRadius: '8px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
                   <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                    {priority}
+                    {priority.name}
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: '700', color: priorityColors[priority] }}>
+                  <div style={{ fontSize: '32px', fontWeight: '700', color: priorityColors[priority.id] }}>
                     {count}
                   </div>
                 </div>
