@@ -1,51 +1,85 @@
 export default async function handler(req, res) {
   const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
-  const BASE_ID = 'appbk0K9riLmqNa56';
-  
-  if (!AIRTABLE_TOKEN) {
-    return res.status(500).json({ error: 'Airtable token not configured' });
+  const BASE_ID = process.env.AIRTABLE_BASE_ID;
+
+  if (!AIRTABLE_TOKEN || !BASE_ID) {
+    return res.status(500).json({ 
+      error: 'Missing Airtable credentials',
+      message: 'Please set AIRTABLE_TOKEN and AIRTABLE_BASE_ID environment variables'
+    });
   }
 
   try {
-    // Try to fetch Priorities table - if it fails, we'll handle it
-    let prioritiesData = { records: [] };
-    try {
-      const prioritiesResponse = await fetch(
-        `https://api.airtable.com/v0/${BASE_ID}/Priorities`,
-        { headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` } }
-      );
-      if (prioritiesResponse.ok) {
-        prioritiesData = await prioritiesResponse.json();
+    // Step 1: Fetch Config table to get field mappings
+    const configResponse = await fetch(
+      `https://api.airtable.com/v0/${BASE_ID}/Config`,
+      {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+        },
       }
-    } catch (e) {
-      console.log('Priorities table not found or error:', e);
+    );
+
+    if (!configResponse.ok) {
+      throw new Error(`Failed to fetch Config table: ${configResponse.statusText}`);
     }
 
-    // Fetch main data
-    const [milestonesData, actionsData, projectsData] = await Promise.all([
-      fetch(`https://api.airtable.com/v0/${BASE_ID}/Milestones`, {
-        headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
-      }).then(r => r.json()),
-      
-      fetch(`https://api.airtable.com/v0/${BASE_ID}/Actions`, {
-        headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
-      }).then(r => r.json()),
-      
-      fetch(`https://api.airtable.com/v0/${BASE_ID}/Projects`, {
-        headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
-      }).then(r => r.json())
-    ]);
+    const configData = await configResponse.json();
+    
+    // Convert config records into a key-value object
+    const config = {};
+    configData.records.forEach(record => {
+      const key = record.fields.Key;
+      const value = record.fields.Value;
+      if (key && value) {
+        config[key] = value;
+      }
+    });
 
-    const processedData = {
-      milestones: milestonesData.records || [],
-      actions: actionsData.records || [],
-      projects: projectsData.records || [],
-      priorities: prioritiesData.records || []
-    };
+    // Validate required config keys
+    const requiredKeys = [
+      'milestone_name_field',
+      'milestone_deadline_field',
+      'milestone_priority_id_field',
+      'milestone_priority_name_field'
+    ];
 
-    res.status(200).json(processedData);
+    const missingKeys = requiredKeys.filter(key => !config[key]);
+    if (missingKeys.length > 0) {
+      return res.status(500).json({
+        error: 'Missing required config keys',
+        missingKeys,
+        message: 'Please add these keys to your Config table in Airtable'
+      });
+    }
+
+    // Step 2: Fetch Milestones table
+    const milestonesResponse = await fetch(
+      `https://api.airtable.com/v0/${BASE_ID}/Milestones`,
+      {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+        },
+      }
+    );
+
+    if (!milestonesResponse.ok) {
+      throw new Error(`Failed to fetch Milestones: ${milestonesResponse.statusText}`);
+    }
+
+    const milestonesData = await milestonesResponse.json();
+
+    // Step 3: Return both config and milestones
+    res.status(200).json({
+      config,
+      milestones: milestonesData.records
+    });
+
   } catch (error) {
     console.error('Airtable API Error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to fetch data from Airtable',
+      message: error.message 
+    });
   }
 }
