@@ -2,52 +2,95 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
 export default function Home() {
+  // Data state
+  const [config, setConfig] = useState({});
   const [milestones, setMilestones] = useState([]);
   const [actions, setActions] = useState([]);
-  const [staffMap, setStaffMap] = useState({});
+  const [peopleMap, setPeopleMap] = useState({});
+  const [prioritiesMap, setPrioritiesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // UI state
+  const [activeTab, setActiveTab] = useState('gantt');
+  
+  // Gantt chart filters and options
   const [groupByPriority, setGroupByPriority] = useState(true);
   const [sortByDeadline, setSortByDeadline] = useState(false);
   const [selectedPriorities, setSelectedPriorities] = useState(new Set());
-  const [activeTab, setActiveTab] = useState('gantt');
+  const [selectedStatuses, setSelectedStatuses] = useState(new Set());
+  const [selectedAccountable, setSelectedAccountable] = useState(new Set());
+  
+  // Actions filters and options
   const [groupByResponsible, setGroupByResponsible] = useState(true);
   const [selectedResponsible, setSelectedResponsible] = useState(new Set());
-  const [selectedStatuses, setSelectedStatuses] = useState(new Set());
+  const [selectedActionStatuses, setSelectedActionStatuses] = useState(new Set());
 
+  // Fetch data on mount
   useEffect(() => {
     fetch('/api/airtable')
       .then(res => res.json())
       .then(data => {
+        setConfig(data.config || {});
         setMilestones(data.milestones || []);
         setActions(data.actions || []);
-        setStaffMap(data.staffMap || {});
+        setPeopleMap(data.peopleMap || {});
+        setPrioritiesMap(data.prioritiesMap || {});
         
-        // Initialize all priorities as selected
+        // Initialize milestone priority filter (all selected)
         const allPriorities = new Set(
           (data.milestones || [])
-            .map(m => m.fields.Priority?.[0])
+            .map(m => {
+              const priorityIds = m.fields[data.config.milestone_priority_id_field || 'Priority area'];
+              return priorityIds?.[0];
+            })
+            .filter(Boolean)
+            .map(id => data.prioritiesMap[id])
             .filter(Boolean)
         );
         setSelectedPriorities(allPriorities);
         
-        // Initialize all responsible people as selected
+        // Initialize milestone status filter (all selected)
+        const allMilestoneStatuses = new Set(
+          (data.milestones || [])
+            .map(m => m.fields[data.config.milestone_status_field || 'Status'])
+            .filter(Boolean)
+        );
+        setSelectedStatuses(allMilestoneStatuses);
+        
+        // Initialize milestone accountable filter (all selected)
+        const allAccountable = new Set(
+          (data.milestones || [])
+            .map(m => {
+              const accountableIds = m.fields[data.config.milestone_accountable_field || 'Accountable'];
+              return accountableIds?.[0];
+            })
+            .filter(Boolean)
+            .map(id => data.peopleMap[id])
+            .filter(Boolean)
+        );
+        setSelectedAccountable(allAccountable);
+        
+        // Initialize action responsible filter (all selected)
         const allResponsible = new Set(
           (data.actions || [])
-            .map(a => a.fields.Responsible?.[0])
+            .map(a => {
+              const responsibleIds = a.fields[data.config.action_responsible_field || 'Responsible'];
+              return responsibleIds?.[0];
+            })
             .filter(Boolean)
-            .map(id => data.staffMap[id])
+            .map(id => data.peopleMap[id])
             .filter(Boolean)
         );
         setSelectedResponsible(allResponsible);
         
-        // Initialize all statuses as selected
-        const allStatuses = new Set(
+        // Initialize action status filter (all selected)
+        const allActionStatuses = new Set(
           (data.actions || [])
-            .map(a => a.fields.Status)
+            .map(a => a.fields[data.config.action_status_field || 'Status'])
             .filter(Boolean)
         );
-        setSelectedStatuses(allStatuses);
+        setSelectedActionStatuses(allActionStatuses);
         
         setLoading(false);
       })
@@ -75,11 +118,29 @@ export default function Home() {
     );
   }
 
+  // Get field names from config with fallbacks
+  const MILESTONE_NAME_FIELD = config.milestone_name_field || 'Name';
+  const MILESTONE_DEADLINE_FIELD = config.milestone_deadline_field || 'Deadline';
+  const MILESTONE_PRIORITY_ID_FIELD = config.milestone_priority_id_field || 'Priority area';
+  const MILESTONE_STATUS_FIELD = config.milestone_status_field || 'Status';
+  const MILESTONE_ACCOUNTABLE_FIELD = config.milestone_accountable_field || 'Accountable';
+  
+  const ACTION_NAME_FIELD = config.action_name_field || 'Name';
+  const ACTION_RESPONSIBLE_FIELD = config.action_responsible_field || 'Responsible';
+  const ACTION_DEADLINE_FIELD = config.action_deadline_field || 'Deadline';
+  const ACTION_STATUS_FIELD = config.action_status_field || 'Status';
+
   // Process milestones data for Gantt chart
   const chartData = milestones.map(milestone => {
-    const name = milestone.fields.Name || 'Unnamed Activity';
-    const deadline = milestone.fields.Deadline || '';
-    const priority = milestone.fields.Priority?.[0] || 'No Priority';
+    const name = milestone.fields[MILESTONE_NAME_FIELD] || 'Unnamed Activity';
+    const deadline = milestone.fields[MILESTONE_DEADLINE_FIELD] || '';
+    const priorityIds = milestone.fields[MILESTONE_PRIORITY_ID_FIELD];
+    const priorityId = priorityIds?.[0];
+    const priority = priorityId ? (prioritiesMap[priorityId] || 'No Priority') : 'No Priority';
+    const status = milestone.fields[MILESTONE_STATUS_FIELD] || 'No Status';
+    const accountableIds = milestone.fields[MILESTONE_ACCOUNTABLE_FIELD];
+    const accountableId = accountableIds?.[0];
+    const accountable = accountableId ? (peopleMap[accountableId] || 'Unassigned') : 'Unassigned';
     
     const deadlineDate = new Date(deadline);
     const startDate = new Date(deadlineDate);
@@ -89,21 +150,42 @@ export default function Home() {
       id: milestone.id,
       name,
       priority,
+      status,
+      accountable,
       start: startDate,
       end: deadlineDate,
       deadline
     };
   })
   .filter(item => item.deadline)
-  .filter(item => selectedPriorities.has(item.priority));
+  .filter(item => selectedPriorities.has(item.priority))
+  .filter(item => selectedStatuses.has(item.status))
+  .filter(item => selectedAccountable.has(item.accountable));
 
+  // Sort by deadline if enabled
   let sortedData = [...chartData];
   if (sortByDeadline) {
     sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   }
 
-  const priorities = [...new Set(milestones.map(m => m.fields.Priority?.[0]).filter(Boolean))].sort();
+  // Get unique values for filters
+  const priorities = [...new Set(milestones.map(m => {
+    const priorityIds = m.fields[MILESTONE_PRIORITY_ID_FIELD];
+    const priorityId = priorityIds?.[0];
+    return priorityId ? prioritiesMap[priorityId] : null;
+  }).filter(Boolean))].sort();
 
+  const milestoneStatuses = [...new Set(milestones.map(m => 
+    m.fields[MILESTONE_STATUS_FIELD]
+  ).filter(Boolean))].sort();
+
+  const accountablePeople = [...new Set(milestones.map(m => {
+    const accountableIds = m.fields[MILESTONE_ACCOUNTABLE_FIELD];
+    const accountableId = accountableIds?.[0];
+    return accountableId ? peopleMap[accountableId] : null;
+  }).filter(Boolean))].sort();
+
+  // Organize data by priority if grouping is enabled
   const organizedData = groupByPriority
     ? priorities
         .filter(priority => selectedPriorities.has(priority))
@@ -114,6 +196,7 @@ export default function Home() {
         .filter(group => group.items.length > 0)
     : [{ priority: null, items: sortedData }];
 
+  // Priority toggle functions
   const togglePriority = (priority) => {
     const newSelected = new Set(selectedPriorities);
     if (newSelected.has(priority)) {
@@ -132,11 +215,50 @@ export default function Home() {
     setSelectedPriorities(new Set());
   };
 
+  // Status toggle functions
+  const toggleStatus = (status) => {
+    const newSelected = new Set(selectedStatuses);
+    if (newSelected.has(status)) {
+      newSelected.delete(status);
+    } else {
+      newSelected.add(status);
+    }
+    setSelectedStatuses(newSelected);
+  };
+
+  const selectAllStatuses = () => {
+    setSelectedStatuses(new Set(milestoneStatuses));
+  };
+
+  const deselectAllStatuses = () => {
+    setSelectedStatuses(new Set());
+  };
+
+  // Accountable toggle functions
+  const toggleAccountable = (person) => {
+    const newSelected = new Set(selectedAccountable);
+    if (newSelected.has(person)) {
+      newSelected.delete(person);
+    } else {
+      newSelected.add(person);
+    }
+    setSelectedAccountable(newSelected);
+  };
+
+  const selectAllAccountable = () => {
+    setSelectedAccountable(new Set(accountablePeople));
+  };
+
+  const deselectAllAccountable = () => {
+    setSelectedAccountable(new Set());
+  };
+
+  // Priority colors
   const priorityColors = {
-    '1. Governance and Leadership': '#3b82f6',
-    '2. Grant making [national perspective approach for Year 1] ': '#10b981',
-    '3. Infrastructure capability support and development': '#f59e0b',
-    '4. Learning and Impact': '#ef4444'
+    '1. Governance and Leadership': '#3b82f6', // blue
+    '2. Grant making [national perspective approach for Year 1] ': '#10b981', // green
+    '3. Infrastructure capability support and development': '#eab308', // yellow
+    '4. Learning and Impact': '#ef4444' // red
   };
 
   // Calculate timeline bounds for Gantt
@@ -168,20 +290,21 @@ export default function Home() {
 
   // Process actions data
   const processedActions = actions.map(action => {
-    const responsibleId = action.fields.Responsible?.[0];
-    const responsibleName = responsibleId ? (staffMap[responsibleId] || 'Unknown') : 'Unassigned';
+    const responsibleIds = action.fields[ACTION_RESPONSIBLE_FIELD];
+    const responsibleId = responsibleIds?.[0];
+    const responsibleName = responsibleId ? (peopleMap[responsibleId] || 'Unknown') : 'Unassigned';
     
     return {
       id: action.id,
-      name: action.fields.Name || 'Unnamed Action',
+      name: action.fields[ACTION_NAME_FIELD] || 'Unnamed Action',
       responsible: responsibleName,
-      deadline: action.fields.Deadline || '',
-      status: action.fields.Status || 'No Status'
+      deadline: action.fields[ACTION_DEADLINE_FIELD] || '',
+      status: action.fields[ACTION_STATUS_FIELD] || 'No Status'
     };
   })
   .filter(action => action.name !== 'Unnamed Action')
   .filter(action => selectedResponsible.has(action.responsible))
-  .filter(action => selectedStatuses.has(action.status));
+  .filter(action => selectedActionStatuses.has(action.status));
 
   // Sort actions by deadline
   let sortedActions = [...processedActions].sort((a, b) => {
@@ -190,13 +313,16 @@ export default function Home() {
     return new Date(a.deadline) - new Date(b.deadline);
   });
 
-  // Get unique responsible people and statuses for filters
+  // Get unique responsible people and statuses for Actions filters
   const allResponsiblePeople = [...new Set(actions.map(a => {
-    const responsibleId = a.fields.Responsible?.[0];
-    return responsibleId ? (staffMap[responsibleId] || 'Unknown') : 'Unassigned';
+    const responsibleIds = a.fields[ACTION_RESPONSIBLE_FIELD];
+    const responsibleId = responsibleIds?.[0];
+    return responsibleId ? peopleMap[responsibleId] : null;
   }).filter(Boolean))].sort();
   
-  const allStatuses = [...new Set(actions.map(a => a.fields.Status).filter(Boolean))].sort();
+  const allActionStatuses = [...new Set(actions.map(a => 
+    a.fields[ACTION_STATUS_FIELD]
+  ).filter(Boolean))].sort();
 
   // Group actions by responsible if enabled
   const organizedActions = groupByResponsible
@@ -209,6 +335,7 @@ export default function Home() {
         .filter(group => group.items.length > 0)
     : [{ responsible: null, items: sortedActions }];
 
+  // Responsible toggle functions
   const toggleResponsible = (person) => {
     const newSelected = new Set(selectedResponsible);
     if (newSelected.has(person)) {
@@ -227,22 +354,23 @@ export default function Home() {
     setSelectedResponsible(new Set());
   };
 
-  const toggleStatus = (status) => {
-    const newSelected = new Set(selectedStatuses);
+  // Action status toggle functions
+  const toggleActionStatus = (status) => {
+    const newSelected = new Set(selectedActionStatuses);
     if (newSelected.has(status)) {
       newSelected.delete(status);
     } else {
       newSelected.add(status);
     }
-    setSelectedStatuses(newSelected);
+    setSelectedActionStatuses(newSelected);
   };
 
-  const selectAllStatuses = () => {
-    setSelectedStatuses(new Set(allStatuses));
+  const selectAllActionStatuses = () => {
+    setSelectedActionStatuses(new Set(allActionStatuses));
   };
 
-  const deselectAllStatuses = () => {
-    setSelectedStatuses(new Set());
+  const deselectAllActionStatuses = () => {
+    setSelectedActionStatuses(new Set());
   };
 
   const formatDate = (dateStr) => {
@@ -403,6 +531,192 @@ export default function Home() {
                           fontWeight: isSelected ? '500' : '400'
                         }}>
                           {priority}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div style={{ 
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                marginBottom: '20px'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                    Filter by Status:
+                  </span>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={selectAllStatuses}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAllStatuses}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {milestoneStatuses.map(status => {
+                    const isSelected = selectedStatuses.has(status);
+                    return (
+                      <label 
+                        key={status} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: isSelected ? '#8b5cf6' : '#e2e8f0',
+                          backgroundColor: isSelected ? '#f5f3ff' : 'white',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleStatus(status)}
+                          style={{ 
+                            width: '16px', 
+                            height: '16px',
+                            cursor: 'pointer',
+                            accentColor: '#8b5cf6'
+                          }}
+                        />
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: isSelected ? '#1e293b' : '#94a3b8',
+                          fontWeight: isSelected ? '500' : '400'
+                        }}>
+                          {status}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Accountable Filter */}
+              <div style={{ 
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                marginBottom: '20px'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                    Filter by Accountable:
+                  </span>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={selectAllAccountable}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAllAccountable}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {accountablePeople.map(person => {
+                    const isSelected = selectedAccountable.has(person);
+                    return (
+                      <label 
+                        key={person} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: isSelected ? '#06b6d4' : '#e2e8f0',
+                          backgroundColor: isSelected ? '#ecfeff' : 'white',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleAccountable(person)}
+                          style={{ 
+                            width: '16px', 
+                            height: '16px',
+                            cursor: 'pointer',
+                            accentColor: '#06b6d4'
+                          }}
+                        />
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: isSelected ? '#1e293b' : '#94a3b8',
+                          fontWeight: isSelected ? '500' : '400'
+                        }}>
+                          {person}
                         </span>
                       </label>
                     );
@@ -605,7 +919,7 @@ export default function Home() {
                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
                   <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                    Total Milestones {selectedPriorities.size < priorities.length ? '(Filtered)' : ''}
+                    Total Milestones {(selectedPriorities.size < priorities.length || selectedStatuses.size < milestoneStatuses.length || selectedAccountable.size < accountablePeople.length) ? '(Filtered)' : ''}
                   </div>
                   <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
                     {chartData.length}
@@ -760,7 +1074,7 @@ export default function Home() {
                   </span>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button
-                      onClick={selectAllStatuses}
+                      onClick={selectAllActionStatuses}
                       style={{
                         padding: '4px 12px',
                         fontSize: '12px',
@@ -775,7 +1089,7 @@ export default function Home() {
                       Select All
                     </button>
                     <button
-                      onClick={deselectAllStatuses}
+                      onClick={deselectAllActionStatuses}
                       style={{
                         padding: '4px 12px',
                         fontSize: '12px',
@@ -792,8 +1106,8 @@ export default function Home() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                  {allStatuses.map(status => {
-                    const isSelected = selectedStatuses.has(status);
+                  {allActionStatuses.map(status => {
+                    const isSelected = selectedActionStatuses.has(status);
                     return (
                       <label 
                         key={status} 
@@ -813,7 +1127,7 @@ export default function Home() {
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleStatus(status)}
+                          onChange={() => toggleActionStatus(status)}
                           style={{ 
                             width: '16px', 
                             height: '16px',
@@ -979,7 +1293,7 @@ export default function Home() {
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }}>
                 <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                  Total Actions {(selectedResponsible.size < allResponsiblePeople.length || selectedStatuses.size < allStatuses.length) ? '(Filtered)' : ''}
+                  Total Actions {(selectedResponsible.size < allResponsiblePeople.length || selectedActionStatuses.size < allActionStatuses.length) ? '(Filtered)' : ''}
                 </div>
                 <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
                   {processedActions.length}
