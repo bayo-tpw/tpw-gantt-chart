@@ -1,11 +1,22 @@
 export default async function handler(req, res) {
-  const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
-  const BASE_ID = process.env.AIRTABLE_BASE_ID;
+  // Try different possible environment variable names
+  const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN || 
+                         process.env.AIRTABLE_API_KEY || 
+                         process.env.AIRTABLE_PERSONAL_ACCESS_TOKEN;
+  
+  const BASE_ID = process.env.AIRTABLE_BASE_ID || 
+                  process.env.BASE_ID ||
+                  process.env.AIRTABLE_BASE;
 
   if (!AIRTABLE_TOKEN || !BASE_ID) {
     return res.status(500).json({ 
       error: 'Missing Airtable credentials',
-      message: 'Please set AIRTABLE_TOKEN and AIRTABLE_BASE_ID environment variables'
+      message: 'Please set AIRTABLE_TOKEN and AIRTABLE_BASE_ID environment variables',
+      debug: {
+        hasToken: !!AIRTABLE_TOKEN,
+        hasBaseId: !!BASE_ID,
+        availableEnvVars: Object.keys(process.env).filter(key => key.includes('AIRTABLE'))
+      }
     });
   }
 
