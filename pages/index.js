@@ -4,14 +4,16 @@ import Head from 'next/head';
 export default function Home() {
   const [milestones, setMilestones] = useState([]);
   const [actions, setActions] = useState([]);
+  const [staffMap, setStaffMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupByPriority, setGroupByPriority] = useState(true);
   const [sortByDeadline, setSortByDeadline] = useState(false);
   const [selectedPriorities, setSelectedPriorities] = useState(new Set());
   const [activeTab, setActiveTab] = useState('gantt');
-  const [groupByResponsible, setGroupByResponsible] = useState(false);
-  const [sortActionsBy, setSortActionsBy] = useState('name');
+  const [groupByResponsible, setGroupByResponsible] = useState(true);
+  const [selectedResponsible, setSelectedResponsible] = useState(new Set());
+  const [selectedStatuses, setSelectedStatuses] = useState(new Set());
 
   useEffect(() => {
     fetch('/api/airtable')
@@ -19,6 +21,8 @@ export default function Home() {
       .then(data => {
         setMilestones(data.milestones || []);
         setActions(data.actions || []);
+        setStaffMap(data.staffMap || {});
+        
         // Initialize all priorities as selected
         const allPriorities = new Set(
           (data.milestones || [])
@@ -26,6 +30,25 @@ export default function Home() {
             .filter(Boolean)
         );
         setSelectedPriorities(allPriorities);
+        
+        // Initialize all responsible people as selected
+        const allResponsible = new Set(
+          (data.actions || [])
+            .map(a => a.fields.Responsible?.[0])
+            .filter(Boolean)
+            .map(id => data.staffMap[id])
+            .filter(Boolean)
+        );
+        setSelectedResponsible(allResponsible);
+        
+        // Initialize all statuses as selected
+        const allStatuses = new Set(
+          (data.actions || [])
+            .map(a => a.fields.Status)
+            .filter(Boolean)
+        );
+        setSelectedStatuses(allStatuses);
+        
         setLoading(false);
       })
       .catch(err => {
@@ -144,39 +167,83 @@ export default function Home() {
   };
 
   // Process actions data
-  const processedActions = actions.map(action => ({
-    id: action.id,
-    name: action.fields.Name || 'Unnamed Action',
-    responsible: action.fields.Responsible || 'Unassigned',
-    deadline: action.fields.Deadline || '',
-    status: action.fields.Status || 'No Status'
-  })).filter(action => action.name !== 'Unnamed Action');
+  const processedActions = actions.map(action => {
+    const responsibleId = action.fields.Responsible?.[0];
+    const responsibleName = responsibleId ? (staffMap[responsibleId] || 'Unknown') : 'Unassigned';
+    
+    return {
+      id: action.id,
+      name: action.fields.Name || 'Unnamed Action',
+      responsible: responsibleName,
+      deadline: action.fields.Deadline || '',
+      status: action.fields.Status || 'No Status'
+    };
+  })
+  .filter(action => action.name !== 'Unnamed Action')
+  .filter(action => selectedResponsible.has(action.responsible))
+  .filter(action => selectedStatuses.has(action.status));
 
-  // Sort actions
-  let sortedActions = [...processedActions];
-  if (sortActionsBy === 'name') {
-    sortedActions.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (sortActionsBy === 'deadline') {
-    sortedActions.sort((a, b) => {
-      if (!a.deadline) return 1;
-      if (!b.deadline) return -1;
-      return new Date(a.deadline) - new Date(b.deadline);
-    });
-  } else if (sortActionsBy === 'responsible') {
-    sortedActions.sort((a, b) => a.responsible.localeCompare(b.responsible));
-  } else if (sortActionsBy === 'status') {
-    sortedActions.sort((a, b) => a.status.localeCompare(b.status));
-  }
+  // Sort actions by deadline
+  let sortedActions = [...processedActions].sort((a, b) => {
+    if (!a.deadline) return 1;
+    if (!b.deadline) return -1;
+    return new Date(a.deadline) - new Date(b.deadline);
+  });
+
+  // Get unique responsible people and statuses for filters
+  const allResponsiblePeople = [...new Set(actions.map(a => {
+    const responsibleId = a.fields.Responsible?.[0];
+    return responsibleId ? (staffMap[responsibleId] || 'Unknown') : 'Unassigned';
+  }).filter(Boolean))].sort();
+  
+  const allStatuses = [...new Set(actions.map(a => a.fields.Status).filter(Boolean))].sort();
 
   // Group actions by responsible if enabled
   const organizedActions = groupByResponsible
-    ? [...new Set(sortedActions.map(a => a.responsible))]
-        .sort()
+    ? allResponsiblePeople
+        .filter(person => selectedResponsible.has(person))
         .map(responsible => ({
           responsible,
           items: sortedActions.filter(a => a.responsible === responsible)
         }))
+        .filter(group => group.items.length > 0)
     : [{ responsible: null, items: sortedActions }];
+
+  const toggleResponsible = (person) => {
+    const newSelected = new Set(selectedResponsible);
+    if (newSelected.has(person)) {
+      newSelected.delete(person);
+    } else {
+      newSelected.add(person);
+    }
+    setSelectedResponsible(newSelected);
+  };
+
+  const selectAllResponsible = () => {
+    setSelectedResponsible(new Set(allResponsiblePeople));
+  };
+
+  const deselectAllResponsible = () => {
+    setSelectedResponsible(new Set());
+  };
+
+  const toggleStatus = (status) => {
+    const newSelected = new Set(selectedStatuses);
+    if (newSelected.has(status)) {
+      newSelected.delete(status);
+    } else {
+      newSelected.add(status);
+    }
+    setSelectedStatuses(newSelected);
+  };
+
+  const selectAllStatuses = () => {
+    setSelectedStatuses(new Set(allStatuses));
+  };
+
+  const deselectAllStatuses = () => {
+    setSelectedStatuses(new Set());
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -581,7 +648,193 @@ export default function Home() {
           {/* Actions Tab */}
           {activeTab === 'actions' && (
             <>
-              {/* Actions Controls */}
+              {/* Filter by Responsible */}
+              <div style={{ 
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                marginBottom: '20px'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                    Filter by Responsible:
+                  </span>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={selectAllResponsible}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAllResponsible}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {allResponsiblePeople.map(person => {
+                    const isSelected = selectedResponsible.has(person);
+                    return (
+                      <label 
+                        key={person} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: isSelected ? '#3b82f6' : '#e2e8f0',
+                          backgroundColor: isSelected ? '#eff6ff' : 'white',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleResponsible(person)}
+                          style={{ 
+                            width: '16px', 
+                            height: '16px',
+                            cursor: 'pointer',
+                            accentColor: '#3b82f6'
+                          }}
+                        />
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: isSelected ? '#1e293b' : '#94a3b8',
+                          fontWeight: isSelected ? '500' : '400'
+                        }}>
+                          {person}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Filter by Status */}
+              <div style={{ 
+                padding: '15px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                marginBottom: '20px'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontWeight: '600', color: '#1e293b' }}>
+                    Filter by Status:
+                  </span>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={selectAllStatuses}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAllStatuses}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '4px',
+                        backgroundColor: 'white',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                  {allStatuses.map(status => {
+                    const isSelected = selectedStatuses.has(status);
+                    return (
+                      <label 
+                        key={status} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: isSelected ? '#10b981' : '#e2e8f0',
+                          backgroundColor: isSelected ? '#f0fdf4' : 'white',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleStatus(status)}
+                          style={{ 
+                            width: '16px', 
+                            height: '16px',
+                            cursor: 'pointer',
+                            accentColor: '#10b981'
+                          }}
+                        />
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: isSelected ? '#1e293b' : '#94a3b8',
+                          fontWeight: isSelected ? '500' : '400'
+                        }}>
+                          {status}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* View Options */}
               <div style={{ 
                 display: 'flex', 
                 gap: '15px', 
@@ -590,33 +843,13 @@ export default function Home() {
                 backgroundColor: 'white',
                 borderRadius: '8px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                alignItems: 'center',
-                flexWrap: 'wrap'
+                alignItems: 'center'
               }}>
                 <span style={{ fontWeight: '600', color: '#1e293b', marginRight: '10px' }}>
-                  Sort by:
+                  View Options:
                 </span>
-                
-                <select
-                  value={sortActionsBy}
-                  onChange={(e) => setSortActionsBy(e.target.value)}
-                  style={{
-                    padding: '8px 12px',
-                    fontSize: '14px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    color: '#475569',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="name">Name</option>
-                  <option value="deadline">Deadline</option>
-                  <option value="responsible">Responsible</option>
-                  <option value="status">Status</option>
-                </select>
 
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginLeft: 'auto' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input 
                     type="checkbox" 
                     checked={groupByResponsible}
@@ -625,6 +858,18 @@ export default function Home() {
                   />
                   <span style={{ fontSize: '14px', color: '#475569' }}>Group by Responsible</span>
                 </label>
+                
+                <div style={{ 
+                  marginLeft: 'auto',
+                  padding: '6px 12px',
+                  backgroundColor: '#f0f9ff',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  color: '#0369a1',
+                  fontWeight: '500'
+                }}>
+                  Sorted by: Deadline (earliest first)
+                </div>
               </div>
 
               {/* Actions Table */}
@@ -734,7 +979,7 @@ export default function Home() {
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }}>
                 <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                  Total Actions
+                  Total Actions {(selectedResponsible.size < allResponsiblePeople.length || selectedStatuses.size < allStatuses.length) ? '(Filtered)' : ''}
                 </div>
                 <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
                   {processedActions.length}
