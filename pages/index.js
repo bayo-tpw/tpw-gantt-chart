@@ -113,8 +113,8 @@ export default function Home() {
   // Color mapping for priorities
   const priorityColors = {
     '1. Governance and Leadership': '#3b82f6',
-    '2. Grant making [national perspective approach for Year 1] ': '#10b981',
-    '3. Infrastructure capability support and development': '#f59e0b',
+    '2. Grant making': '#10b981',
+    '3. Capability support and development': '#f59e0b',
     '4. Learning and Impact': '#ef4444'
   };
 
