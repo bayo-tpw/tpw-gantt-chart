@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
 
 export default function GanttChart() {
   const [data, setData] = useState({
@@ -16,6 +15,37 @@ export default function GanttChart() {
   const { milestones, actions, peopleMap, prioritiesMap, config } = data;
 
   useEffect(() => {
+    // Add CSS directly to the document head to override any conflicts
+    const style = document.createElement('style');
+    style.textContent = `
+      body, html {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        font-family: Arial, sans-serif !important;
+        background: #f5f5f5 !important;
+      }
+      #__next {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      .app-container {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 20px !important;
+        box-sizing: border-box !important;
+      }
+      .content-wrapper {
+        max-width: 1200px !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+      }
+    `;
+    document.head.appendChild(style);
+
     fetch('/api/airtable')
       .then(response => response.json())
       .then(data => {
@@ -27,6 +57,13 @@ export default function GanttChart() {
         console.error('Error fetching data:', error);
         setLoading(false);
       });
+
+    return () => {
+      // Cleanup
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    };
   }, []);
 
   const toggleNoteExpansion = (actionId) => {
@@ -93,313 +130,254 @@ export default function GanttChart() {
 
   if (loading) {
     return (
-      <>
-        <Head>
-          <style>{`
-            body { 
-              margin: 0 !important; 
-              padding: 0 !important; 
-              width: 100vw !important;
-              font-family: Arial, sans-serif !important;
-            }
-            #__next { 
-              width: 100vw !important; 
-              margin: 0 !important; 
-              padding: 0 !important; 
-            }
-            * { 
-              box-sizing: border-box !important; 
-            }
-          `}</style>
-        </Head>
-        <div style={{ 
-          width: '100vw', 
-          height: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          backgroundColor: '#f8f9fa',
-          margin: 0,
-          padding: 0
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        width: '100vw',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        background: '#f5f5f5'
+      }}>
+        <div style={{
+          background: 'white',
+          padding: '30px',
+          borderRadius: '10px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          textAlign: 'center'
         }}>
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '40px', 
-            borderRadius: '8px', 
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' 
-          }}>
-            <h2 style={{ fontSize: '24px', marginBottom: '10px', margin: '0 0 10px 0' }}>Loading...</h2>
-            <p style={{ color: '#666', margin: 0 }}>Fetching data from Airtable</p>
-          </div>
+          <h2 style={{ margin: '0 0 10px 0', fontSize: '24px' }}>Loading...</h2>
+          <p style={{ margin: 0, color: '#666' }}>Fetching data from Airtable</p>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <Head>
-        <style>{`
-          body { 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            width: 100vw !important;
-            font-family: Arial, sans-serif !important;
-            background-color: #f8f9fa !important;
-          }
-          #__next { 
-            width: 100vw !important; 
-            margin: 0 !important; 
-            padding: 0 !important; 
-          }
-          * { 
-            box-sizing: border-box !important; 
-          }
-        `}</style>
-      </Head>
-      
-      <div style={{
-        width: '100vw',
-        minHeight: '100vh',
-        padding: '30px',
-        backgroundColor: '#f8f9fa',
-        margin: 0
-      }}>
+    <div className="app-container">
+      <div className="content-wrapper">
         <h1 style={{
-          fontSize: '32px',
-          fontWeight: 'bold',
-          marginBottom: '40px',
-          color: '#333',
           textAlign: 'center',
-          width: '100%'
+          fontSize: '36px',
+          margin: '0 0 40px 0',
+          color: '#333',
+          fontWeight: 'bold'
         }}>
           TPW Regional Delivery Action Plan
         </h1>
-        
+
+        {/* Tab Navigation */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
-          marginBottom: '40px',
-          width: '100%'
+          marginBottom: '40px'
         }}>
           <div style={{
             display: 'flex',
-            backgroundColor: '#e9ecef',
-            borderRadius: '12px',
-            padding: '6px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            background: '#e9ecef',
+            borderRadius: '10px',
+            padding: '5px'
           }}>
             <button
-              style={{
-                padding: '14px 28px',
-                border: 'none',
-                background: activeTab === 'gantt' ? 'white' : 'transparent',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: activeTab === 'gantt' ? 'bold' : '500',
-                borderRadius: '8px',
-                color: activeTab === 'gantt' ? '#007bff' : '#666',
-                boxShadow: activeTab === 'gantt' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
-              }}
               onClick={() => setActiveTab('gantt')}
+              style={{
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '8px',
+                background: activeTab === 'gantt' ? 'white' : 'transparent',
+                color: activeTab === 'gantt' ? '#007bff' : '#666',
+                fontWeight: activeTab === 'gantt' ? 'bold' : 'normal',
+                fontSize: '16px',
+                cursor: 'pointer',
+                boxShadow: activeTab === 'gantt' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+              }}
             >
-              Gantt Chart ({processedChartData.length})
+              Milestones ({processedChartData.length})
             </button>
             <button
-              style={{
-                padding: '14px 28px',
-                border: 'none',
-                background: activeTab === 'actions' ? 'white' : 'transparent',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: activeTab === 'actions' ? 'bold' : '500',
-                borderRadius: '8px',
-                color: activeTab === 'actions' ? '#007bff' : '#666',
-                boxShadow: activeTab === 'actions' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
-              }}
               onClick={() => setActiveTab('actions')}
+              style={{
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '8px',
+                background: activeTab === 'actions' ? 'white' : 'transparent',
+                color: activeTab === 'actions' ? '#007bff' : '#666',
+                fontWeight: activeTab === 'actions' ? 'bold' : 'normal',
+                fontSize: '16px',
+                cursor: 'pointer',
+                boxShadow: activeTab === 'actions' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+              }}
             >
               Actions ({processedActions.length})
             </button>
           </div>
         </div>
 
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          width: '100%'
-        }}>
-          {activeTab === 'gantt' && (
-            <div>
-              <h2 style={{
-                fontSize: '28px',
-                fontWeight: 'bold',
-                marginBottom: '30px',
-                color: '#333',
-                borderBottom: '3px solid #007bff',
-                paddingBottom: '12px',
-                textAlign: 'center'
+        {/* Content Area */}
+        {activeTab === 'gantt' && (
+          <div>
+            <h2 style={{
+              fontSize: '28px',
+              textAlign: 'center',
+              margin: '0 0 30px 0',
+              color: '#333',
+              borderBottom: '3px solid #007bff',
+              paddingBottom: '10px'
+            }}>
+              Milestones
+            </h2>
+
+            {processedChartData.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '60px',
+                background: 'white',
+                borderRadius: '10px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
-                Milestones
-              </h2>
-              {processedChartData.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '80px 20px',
-                  color: '#666',
-                  background: 'white',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                }}>
-                  <h3 style={{ fontSize: '24px', marginBottom: '12px', color: '#333' }}>No milestones found</h3>
-                  <p style={{ fontSize: '16px' }}>Check your Airtable configuration</p>
-                </div>
-              ) : (
-                processedChartData.map(item => (
+                <h3 style={{ color: '#333', margin: '0 0 10px 0' }}>No milestones found</h3>
+                <p style={{ color: '#666', margin: 0 }}>Check your Airtable configuration</p>
+              </div>
+            ) : (
+              <div>
+                {processedChartData.map(item => (
                   <div key={item.id} style={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '12px',
-                    padding: '24px',
-                    marginBottom: '24px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                    background: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '10px',
+                    padding: '20px',
+                    marginBottom: '20px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}>
-                    <div style={{
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      marginBottom: '16px',
+                    <h3 style={{
+                      fontSize: '18px',
+                      margin: '0 0 15px 0',
                       color: '#333',
-                      lineHeight: '1.4'
+                      fontWeight: 'bold'
                     }}>
                       {item.name}
-                    </div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '12px'
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Priority:</span>
-                        <span>{item.priority}</span>
-                      </div>
-                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Status:</span>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '6px 12px',
-                          borderRadius: '16px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          textTransform: 'uppercase',
-                          backgroundColor: item.status.toLowerCase().includes('complete') ? '#e8f5e8' : 
-                                         item.status.toLowerCase().includes('progress') ? '#e3f2fd' : '#f8f9fa',
-                          color: item.status.toLowerCase().includes('complete') ? '#2e7d32' : 
-                                item.status.toLowerCase().includes('progress') ? '#1976d2' : '#6c757d'
-                        }}>
-                          {item.status}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Accountable:</span>
-                        <span>{item.accountable}</span>
-                      </div>
-                      {item.deadline && (
-                        <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Deadline:</span>
-                          <span>{new Date(item.deadline).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                    </div>
+                    </h3>
+                    
+                    <table style={{ width: '100%', fontSize: '14px' }}>
+                      <tbody>
+                        <tr>
+                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Priority:</td>
+                          <td style={{ padding: '5px', color: '#333' }}>{item.priority}</td>
+                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Status:</td>
+                          <td style={{ padding: '5px' }}>
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              background: item.status.toLowerCase().includes('complete') ? '#d4edda' : 
+                                         item.status.toLowerCase().includes('progress') ? '#cce5ff' : '#f8f9fa',
+                              color: item.status.toLowerCase().includes('complete') ? '#155724' : 
+                                    item.status.toLowerCase().includes('progress') ? '#0056b3' : '#6c757d'
+                            }}>
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666' }}>Accountable:</td>
+                          <td style={{ padding: '5px', color: '#333' }}>{item.accountable}</td>
+                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666' }}>Deadline:</td>
+                          <td style={{ padding: '5px', color: '#333' }}>
+                            {item.deadline ? new Date(item.deadline).toLocaleDateString() : 'Not set'}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-          {activeTab === 'actions' && (
-            <div>
-              <h2 style={{
-                fontSize: '28px',
-                fontWeight: 'bold',
-                marginBottom: '30px',
-                color: '#333',
-                borderBottom: '3px solid #007bff',
-                paddingBottom: '12px',
-                textAlign: 'center'
+        {activeTab === 'actions' && (
+          <div>
+            <h2 style={{
+              fontSize: '28px',
+              textAlign: 'center',
+              margin: '0 0 30px 0',
+              color: '#333',
+              borderBottom: '3px solid #007bff',
+              paddingBottom: '10px'
+            }}>
+              Actions (Director View Only)
+            </h2>
+
+            {processedActions.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '60px',
+                background: 'white',
+                borderRadius: '10px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
-                Actions (Director View Only)
-              </h2>
-              {processedActions.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '80px 20px',
-                  color: '#666',
-                  background: 'white',
-                  borderRadius: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                }}>
-                  <h3 style={{ fontSize: '24px', marginBottom: '12px', color: '#333' }}>No actions found</h3>
-                  <p style={{ fontSize: '16px' }}>No actions have Director View = true</p>
-                </div>
-              ) : (
-                processedActions.map(action => (
+                <h3 style={{ color: '#333', margin: '0 0 10px 0' }}>No actions found</h3>
+                <p style={{ color: '#666', margin: 0 }}>No actions have Director View = true</p>
+              </div>
+            ) : (
+              <div>
+                {processedActions.map(action => (
                   <div key={action.id} style={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '12px',
-                    padding: '24px',
-                    marginBottom: '24px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                    background: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '10px',
+                    padding: '20px',
+                    marginBottom: '20px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                   }}>
-                    <div style={{
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      marginBottom: '16px',
+                    <h3 style={{
+                      fontSize: '18px',
+                      margin: '0 0 15px 0',
                       color: '#333',
-                      lineHeight: '1.4'
+                      fontWeight: 'bold'
                     }}>
                       {action.name}
-                    </div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                      gap: '12px'
-                    }}>
-                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Responsible:</span>
-                        <span>{action.responsible}</span>
-                      </div>
-                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Status:</span>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '6px 12px',
-                          borderRadius: '16px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          textTransform: 'uppercase',
-                          backgroundColor: action.status.toLowerCase().includes('complete') ? '#e8f5e8' : 
-                                         action.status.toLowerCase().includes('progress') ? '#e3f2fd' : '#f8f9fa',
-                          color: action.status.toLowerCase().includes('complete') ? '#2e7d32' : 
-                                action.status.toLowerCase().includes('progress') ? '#1976d2' : '#6c757d'
-                        }}>
-                          {action.status}
-                        </span>
-                      </div>
-                      {action.deadline && (
-                        <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Deadline:</span>
-                          <span>{new Date(action.deadline).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                    </div>
+                    </h3>
+                    
+                    <table style={{ width: '100%', fontSize: '14px' }}>
+                      <tbody>
+                        <tr>
+                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Responsible:</td>
+                          <td style={{ padding: '5px', color: '#333' }}>{action.responsible}</td>
+                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Status:</td>
+                          <td style={{ padding: '5px' }}>
+                            <span style={{
+                              padding: '4px 8px',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              background: action.status.toLowerCase().includes('complete') ? '#d4edda' : 
+                                         action.status.toLowerCase().includes('progress') ? '#cce5ff' : '#f8f9fa',
+                              color: action.status.toLowerCase().includes('complete') ? '#155724' : 
+                                    action.status.toLowerCase().includes('progress') ? '#0056b3' : '#6c757d'
+                            }}>
+                              {action.status}
+                            </span>
+                          </td>
+                        </tr>
+                        {action.deadline && (
+                          <tr>
+                            <td style={{ padding: '5px', fontWeight: 'bold', color: '#666' }}>Deadline:</td>
+                            <td style={{ padding: '5px', color: '#333' }} colSpan={3}>
+                              {new Date(action.deadline).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+
                     {action.notes && (
-                      <div style={{
-                        marginTop: '20px',
-                        borderTop: '1px solid #eee',
-                        paddingTop: '16px'
-                      }}>
+                      <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
                         <button
+                          onClick={() => toggleNoteExpansion(action.id)}
                           style={{
                             background: '#007bff',
                             color: 'white',
@@ -407,22 +385,19 @@ export default function GanttChart() {
                             padding: '8px 16px',
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '500'
+                            fontSize: '14px'
                           }}
-                          onClick={() => toggleNoteExpansion(action.id)}
                         >
                           {expandedNotes.has(action.id) ? 'Hide Notes' : 'Show Notes'}
                         </button>
                         {expandedNotes.has(action.id) && (
                           <div style={{
-                            marginTop: '12px',
-                            padding: '16px',
-                            backgroundColor: '#f8f9fa',
-                            borderRadius: '8px',
+                            marginTop: '10px',
+                            padding: '15px',
+                            background: '#f8f9fa',
+                            borderRadius: '6px',
                             borderLeft: '4px solid #007bff',
-                            color: '#555',
-                            lineHeight: '1.6'
+                            color: '#555'
                           }}>
                             {action.notes}
                           </div>
@@ -430,12 +405,12 @@ export default function GanttChart() {
                       </div>
                     )}
                   </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
