@@ -32,6 +32,13 @@ export default function Home() {
     fetch('/api/airtable')
       .then(res => res.json())
       .then(data => {
+        console.log('=== API RESPONSE DEBUG ===');
+        console.log('Config received:', Object.keys(data.config || {}));
+        console.log('Milestones count:', (data.milestones || []).length);
+        console.log('Actions count:', (data.actions || []).length);
+        console.log('People Map received:', data.peopleMap);
+        console.log('Sample action Responsible field:', data.actions?.[0]?.fields);
+        
         setConfig(data.config || {});
         setMilestones(data.milestones || []);
         setActions(data.actions || []);
@@ -366,13 +373,21 @@ export default function Home() {
     };
   });
 
-  // Debug logging
+  console.log('=== ACTIONS DEBUG ===');
   console.log('Total actions:', processedActions.length);
   console.log('Actions with TPW Role "Current":', processedActions.filter(a => a.tpwRole === 'Current').length);
   console.log('Sample action:', processedActions[0]);
+  console.log('Sample action RAW Responsible field:', actions[0]?.fields[ACTION_RESPONSIBLE_FIELD]);
+  console.log('Type of Responsible field:', typeof actions[0]?.fields[ACTION_RESPONSIBLE_FIELD]);
+  console.log('Is Responsible field an array?:', Array.isArray(actions[0]?.fields[ACTION_RESPONSIBLE_FIELD]));
   console.log('All responsible people:', [...new Set(processedActions.map(a => a.responsible))]);
+  console.log('Unknown actions (first 3):', processedActions.filter(a => a.responsible === 'Unknown').slice(0, 3).map(a => ({
+    name: a.name,
+    responsibleFieldRaw: actions.find(act => act.id === a.id)?.fields[ACTION_RESPONSIBLE_FIELD]
+  })));
   console.log('Adebayo actions:', processedActions.filter(a => a.responsible.toLowerCase().includes('adebayo') || a.responsible.toLowerCase().includes('obasaju') || a.responsible.toLowerCase().includes('bayo')));
-  console.log('People Map:', peopleMap);
+  console.log('People Map (first 3):', Object.entries(peopleMap).slice(0, 3));
+  console.log('Does peopleMap have recrPq94c7VibDBk8?:', peopleMap['recrPq94c7VibDBk8']);
   console.log('Selected Responsible:', Array.from(selectedResponsible));
   
   const filteredActions = processedActions
