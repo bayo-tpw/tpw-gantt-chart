@@ -58,9 +58,15 @@ export default function Home() {
         const allAccountable = new Set(
           (data.milestones || [])
             .map(m => {
-              const accountableIds = m.fields[data.config.milestone_accountable_field || 'Accountable'];
-              const accountableId = accountableIds?.[0];
-              return accountableId ? data.peopleMap[accountableId] : 'Unassigned';
+              const accountableField = m.fields[data.config.milestone_accountable_field || 'Accountable'];
+              // Handle both linked record array and single select text
+              if (Array.isArray(accountableField) && accountableField.length > 0) {
+                const accountableId = accountableField[0];
+                return data.peopleMap[accountableId] || 'Unassigned';
+              } else if (typeof accountableField === 'string' && accountableField) {
+                return accountableField;
+              }
+              return 'Unassigned';
             })
             .filter(Boolean)
         );
@@ -71,11 +77,16 @@ export default function Home() {
           (data.actions || [])
             .filter(a => (a.fields[data.config.action_tpw_role_field || 'Current Status (TPW Role)'] || '') === 'Current')
             .map(a => {
-              const responsibleIds = a.fields[data.config.action_responsible_field || 'Responsible'];
-              return responsibleIds?.[0];
+              const responsibleField = a.fields[data.config.action_responsible_field || 'Responsible'];
+              // Handle both linked record array and single select text
+              if (Array.isArray(responsibleField) && responsibleField.length > 0) {
+                const responsibleId = responsibleField[0];
+                return data.peopleMap[responsibleId] || null;
+              } else if (typeof responsibleField === 'string' && responsibleField) {
+                return responsibleField;
+              }
+              return null;
             })
-            .filter(Boolean)
-            .map(id => data.peopleMap[id])
             .filter(Boolean)
         );
         setSelectedResponsible(allResponsible);
@@ -141,9 +152,18 @@ export default function Home() {
     const priority = milestone.fields[MILESTONE_PRIORITY_NAME_FIELD]?.[0] || 'No Priority';
     
     const status = milestone.fields[MILESTONE_STATUS_FIELD] || 'No Status';
-    const accountableIds = milestone.fields[MILESTONE_ACCOUNTABLE_FIELD];
-    const accountableId = accountableIds?.[0];
-    const accountable = accountableId ? (peopleMap[accountableId] || 'Unassigned') : 'Unassigned';
+    
+    // Handle Accountable field - could be single select text OR linked record
+    const accountableField = milestone.fields[MILESTONE_ACCOUNTABLE_FIELD];
+    let accountable = 'Unassigned';
+    if (Array.isArray(accountableField) && accountableField.length > 0) {
+      // It's a linked record - look up in peopleMap
+      const accountableId = accountableField[0];
+      accountable = peopleMap[accountableId] || 'Unassigned';
+    } else if (typeof accountableField === 'string' && accountableField) {
+      // It's a single select text field - use directly
+      accountable = accountableField;
+    }
     
     // Use actual start date if available, otherwise estimate
     let startDate;
@@ -180,9 +200,15 @@ export default function Home() {
   ).filter(Boolean))].sort();
 
   const accountablePeople = [...new Set(milestones.map(m => {
-    const accountableIds = m.fields[MILESTONE_ACCOUNTABLE_FIELD];
-    const accountableId = accountableIds?.[0];
-    return accountableId ? peopleMap[accountableId] : 'Unassigned';
+    const accountableField = m.fields[MILESTONE_ACCOUNTABLE_FIELD];
+    // Handle both linked record array and single select text
+    if (Array.isArray(accountableField) && accountableField.length > 0) {
+      const accountableId = accountableField[0];
+      return peopleMap[accountableId] || 'Unassigned';
+    } else if (typeof accountableField === 'string' && accountableField) {
+      return accountableField;
+    }
+    return 'Unassigned';
   }).filter(Boolean))].sort();
 
   // Debug logging
@@ -316,9 +342,18 @@ export default function Home() {
 
   // Process actions data
   const processedActions = actions.map(action => {
-    const responsibleIds = action.fields[ACTION_RESPONSIBLE_FIELD];
-    const responsibleId = responsibleIds?.[0];
-    const responsibleName = responsibleId ? (peopleMap[responsibleId] || 'Unknown') : 'Unassigned';
+    // Handle Responsible field - could be single select text OR linked record
+    const responsibleField = action.fields[ACTION_RESPONSIBLE_FIELD];
+    let responsibleName = 'Unassigned';
+    if (Array.isArray(responsibleField) && responsibleField.length > 0) {
+      // It's a linked record - look up in peopleMap
+      const responsibleId = responsibleField[0];
+      responsibleName = peopleMap[responsibleId] || 'Unknown';
+    } else if (typeof responsibleField === 'string' && responsibleField) {
+      // It's a single select text field - use directly
+      responsibleName = responsibleField;
+    }
+    
     const tpwRole = action.fields[ACTION_TPW_ROLE_FIELD] || '';
     
     return {
@@ -336,7 +371,7 @@ export default function Home() {
   console.log('Actions with TPW Role "Current":', processedActions.filter(a => a.tpwRole === 'Current').length);
   console.log('Sample action:', processedActions[0]);
   console.log('All responsible people:', [...new Set(processedActions.map(a => a.responsible))]);
-  console.log('Adebayo actions:', processedActions.filter(a => a.responsible.includes('Adebayo') || a.responsible.includes('Obasaju') || a.responsible.includes('Bayo')));
+  console.log('Adebayo actions:', processedActions.filter(a => a.responsible.toLowerCase().includes('adebayo') || a.responsible.toLowerCase().includes('obasaju') || a.responsible.toLowerCase().includes('bayo')));
   console.log('People Map:', peopleMap);
   console.log('Selected Responsible:', Array.from(selectedResponsible));
   
@@ -357,9 +392,15 @@ export default function Home() {
   const allResponsiblePeople = [...new Set(actions
     .filter(a => (a.fields[ACTION_TPW_ROLE_FIELD] || '') === 'Current')
     .map(a => {
-      const responsibleIds = a.fields[ACTION_RESPONSIBLE_FIELD];
-      const responsibleId = responsibleIds?.[0];
-      return responsibleId ? peopleMap[responsibleId] : null;
+      const responsibleField = a.fields[ACTION_RESPONSIBLE_FIELD];
+      // Handle both linked record array and single select text
+      if (Array.isArray(responsibleField) && responsibleField.length > 0) {
+        const responsibleId = responsibleField[0];
+        return peopleMap[responsibleId] || null;
+      } else if (typeof responsibleField === 'string' && responsibleField) {
+        return responsibleField;
+      }
+      return null;
     })
     .filter(Boolean)
   )].sort();
