@@ -78,6 +78,7 @@ export default async function handler(req, res) {
       ]
     }));
     console.log('API: Actions fetched:', actionsData.length);
+    console.log('API: Sample action fields:', actionsData[0]?.fields ? Object.keys(actionsData[0].fields) : 'No actions found');
 
     // Fetch People table with pagination
     console.log('API: Fetching People...');
@@ -125,12 +126,23 @@ export default async function handler(req, res) {
     console.log('API: PeopleMap created with', Object.keys(peopleMap).length, 'entries');
 
     // Process actions
+    console.log('API: Sample action before filtering:', actionsData[0]?.fields);
+    console.log('API: ACTION_DIRECTOR_VIEW_FIELD:', ACTION_DIRECTOR_VIEW_FIELD);
+    
     const actions = actionsData
       .filter(record => {
         // Filter by TPW Role = 'Current' AND Director View = true
         const tpwRole = record.fields[ACTION_TPW_ROLE_FIELD];
         const directorView = record.fields[ACTION_DIRECTOR_VIEW_FIELD];
-        return tpwRole === 'Current' && directorView === true;
+        
+        console.log('API: Record', record.id, 'TPW Role:', tpwRole, 'Director View:', directorView);
+        
+        const passesFilter = tpwRole === 'Current' && directorView === true;
+        if (!passesFilter) {
+          console.log('API: Record', record.id, 'filtered out - TPW Role:', tpwRole, 'Director View:', directorView);
+        }
+        
+        return passesFilter;
       })
       .map(record => {
         const responsibleField = record.fields[ACTION_RESPONSIBLE_FIELD];
@@ -157,6 +169,8 @@ export default async function handler(req, res) {
         };
       });
 
+    console.log('API: Total actions before filtering:', actionsData.length);
+    console.log('API: Actions after TPW Role + Director View filtering:', actions.length);
     console.log('API: Processed', milestones.length, 'milestones and', actions.length, 'actions');
 
     const response = {
