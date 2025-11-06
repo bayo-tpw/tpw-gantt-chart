@@ -54,15 +54,14 @@ export default function Home() {
         );
         setSelectedStatuses(allMilestoneStatuses);
         
-        // Initialize milestone accountable filter (all selected)
+        // Initialize milestone accountable filter (all selected, including Unassigned)
         const allAccountable = new Set(
           (data.milestones || [])
             .map(m => {
               const accountableIds = m.fields[data.config.milestone_accountable_field || 'Accountable'];
-              return accountableIds?.[0];
+              const accountableId = accountableIds?.[0];
+              return accountableId ? data.peopleMap[accountableId] : 'Unassigned';
             })
-            .filter(Boolean)
-            .map(id => data.peopleMap[id])
             .filter(Boolean)
         );
         setSelectedAccountable(allAccountable);
@@ -171,6 +170,21 @@ export default function Home() {
     };
   });
   
+  // Get unique values for filters (needed before console logs)
+  const priorities = [...new Set(milestones.map(m => 
+    m.fields[MILESTONE_PRIORITY_NAME_FIELD]?.[0]
+  ).filter(Boolean))].sort();
+
+  const milestoneStatuses = [...new Set(milestones.map(m => 
+    m.fields[MILESTONE_STATUS_FIELD]
+  ).filter(Boolean))].sort();
+
+  const accountablePeople = [...new Set(milestones.map(m => {
+    const accountableIds = m.fields[MILESTONE_ACCOUNTABLE_FIELD];
+    const accountableId = accountableIds?.[0];
+    return accountableId ? peopleMap[accountableId] : 'Unassigned';
+  }).filter(Boolean))].sort();
+
   // Debug logging
   console.log('=== GANTT CHART DEBUG ===');
   console.log('Total milestones:', chartData.length);
@@ -196,21 +210,6 @@ export default function Home() {
   if (sortByDeadline) {
     sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   }
-
-  // Get unique values for filters
-  const priorities = [...new Set(milestones.map(m => 
-    m.fields[MILESTONE_PRIORITY_NAME_FIELD]?.[0]
-  ).filter(Boolean))].sort();
-
-  const milestoneStatuses = [...new Set(milestones.map(m => 
-    m.fields[MILESTONE_STATUS_FIELD]
-  ).filter(Boolean))].sort();
-
-  const accountablePeople = [...new Set(milestones.map(m => {
-    const accountableIds = m.fields[MILESTONE_ACCOUNTABLE_FIELD];
-    const accountableId = accountableIds?.[0];
-    return accountableId ? peopleMap[accountableId] : null;
-  }).filter(Boolean))].sort();
 
   // Organize data by priority if grouping is enabled
   const organizedData = groupByPriority
@@ -283,8 +282,8 @@ export default function Home() {
   // Priority colors
   const priorityColors = {
     '1. Governance and Leadership': '#3b82f6', // blue
-    '2. Grant making [national perspective approach for Year 1] ': '#10b981', // green
-    '3. Infrastructure capability support and development': '#eab308', // yellow
+    '2. Grant making': '#10b981', // green  
+    '3. Capability support and development': '#eab308', // yellow
     '4. Learning and Impact': '#ef4444' // red
   };
 
