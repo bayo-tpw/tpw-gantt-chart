@@ -40,12 +40,7 @@ export default function Home() {
         // Initialize milestone priority filter (all selected)
         const allPriorities = new Set(
           (data.milestones || [])
-            .map(m => {
-              const priorityIds = m.fields[data.config.milestone_priority_id_field || 'Priority area'];
-              return priorityIds?.[0];
-            })
-            .filter(Boolean)
-            .map(id => data.prioritiesMap[id])
+            .map(m => m.fields[data.config.milestone_priority_name_field || 'Priority']?.[0])
             .filter(Boolean)
         );
         setSelectedPriorities(allPriorities);
@@ -71,9 +66,10 @@ export default function Home() {
         );
         setSelectedAccountable(allAccountable);
         
-        // Initialize action responsible filter (all selected)
+        // Initialize action responsible filter (all selected, only Current TPW Role)
         const allResponsible = new Set(
           (data.actions || [])
+            .filter(a => (a.fields[data.config.action_tpw_role_field || 'Current Status (TPW Role)'] || '') === 'Current')
             .map(a => {
               const responsibleIds = a.fields[data.config.action_responsible_field || 'Responsible'];
               return responsibleIds?.[0];
@@ -84,9 +80,10 @@ export default function Home() {
         );
         setSelectedResponsible(allResponsible);
         
-        // Initialize action status filter (all selected)
+        // Initialize action status filter (all selected, only Current TPW Role)
         const allActionStatuses = new Set(
           (data.actions || [])
+            .filter(a => (a.fields[data.config.action_tpw_role_field || 'Current Status (TPW Role)'] || '') === 'Current')
             .map(a => a.fields[data.config.action_status_field || 'Status'])
             .filter(Boolean)
         );
@@ -132,22 +129,33 @@ export default function Home() {
   const ACTION_RESPONSIBLE_FIELD = config.action_responsible_field || 'Responsible';
   const ACTION_DEADLINE_FIELD = config.action_deadline_field || 'Deadline';
   const ACTION_STATUS_FIELD = config.action_status_field || 'Status';
+  const ACTION_TPW_ROLE_FIELD = config.action_tpw_role_field || 'Current Status (TPW Role)';
 
   // Process milestones data for Gantt chart
   const chartData = milestones.map(milestone => {
     const name = milestone.fields[MILESTONE_NAME_FIELD] || 'Unnamed Activity';
     const deadline = milestone.fields[MILESTONE_DEADLINE_FIELD] || '';
-    const priorityIds = milestone.fields[MILESTONE_PRIORITY_ID_FIELD];
-    const priorityId = priorityIds?.[0];
-    const priority = priorityId ? (prioritiesMap[priorityId] || 'No Priority') : 'No Priority';
+    const startDateField = milestone.fields[MILESTONE_START_FIELD] || '';
+    
+    // Use priority name field directly instead of looking up by ID
+    const priority = milestone.fields[MILESTONE_PRIORITY_NAME_FIELD]?.[0] || 'No Priority';
+    
     const status = milestone.fields[MILESTONE_STATUS_FIELD] || 'No Status';
     const accountableIds = milestone.fields[MILESTONE_ACCOUNTABLE_FIELD];
     const accountableId = accountableIds?.[0];
     const accountable = accountableId ? (peopleMap[accountableId] || 'Unassigned') : 'Unassigned';
     
+    // Use actual start date if available, otherwise estimate
+    let startDate;
+    if (startDateField) {
+      startDate = new Date(startDateField);
+    } else {
+      const deadlineDate = new Date(deadline);
+      startDate = new Date(deadlineDate);
+      startDate.setMonth(startDate.getMonth() - 3);
+    }
+    
     const deadlineDate = new Date(deadline);
-    const startDate = new Date(deadlineDate);
-    startDate.setMonth(startDate.getMonth() - 3);
     
     return {
       id: milestone.id,
@@ -157,7 +165,8 @@ export default function Home() {
       accountable,
       start: startDate,
       end: deadlineDate,
-      deadline
+      deadline,
+      hasStartDate: !!startDateField
     };
   })
   .filter(item => item.deadline)
@@ -172,11 +181,9 @@ export default function Home() {
   }
 
   // Get unique values for filters
-  const priorities = [...new Set(milestones.map(m => {
-    const priorityIds = m.fields[MILESTONE_PRIORITY_ID_FIELD];
-    const priorityId = priorityIds?.[0];
-    return priorityId ? prioritiesMap[priorityId] : null;
-  }).filter(Boolean))].sort();
+  const priorities = [...new Set(milestones.map(m => 
+    m.fields[MILESTONE_PRIORITY_NAME_FIELD]?.[0]
+  ).filter(Boolean))].sort();
 
   const milestoneStatuses = [...new Set(milestones.map(m => 
     m.fields[MILESTONE_STATUS_FIELD]
@@ -296,16 +303,19 @@ export default function Home() {
     const responsibleIds = action.fields[ACTION_RESPONSIBLE_FIELD];
     const responsibleId = responsibleIds?.[0];
     const responsibleName = responsibleId ? (peopleMap[responsibleId] || 'Unknown') : 'Unassigned';
+    const tpwRole = action.fields[ACTION_TPW_ROLE_FIELD] || '';
     
     return {
       id: action.id,
       name: action.fields[ACTION_NAME_FIELD] || 'Unnamed Action',
       responsible: responsibleName,
       deadline: action.fields[ACTION_DEADLINE_FIELD] || '',
-      status: action.fields[ACTION_STATUS_FIELD] || 'No Status'
+      status: action.fields[ACTION_STATUS_FIELD] || 'No Status',
+      tpwRole: tpwRole
     };
   })
   .filter(action => action.name !== 'Unnamed Action')
+  .filter(action => action.tpwRole === 'Current') // Only show actions where TPW Role is 'Current'
   .filter(action => selectedResponsible.has(action.responsible))
   .filter(action => selectedActionStatuses.has(action.status));
 
@@ -316,16 +326,22 @@ export default function Home() {
     return new Date(a.deadline) - new Date(b.deadline);
   });
 
-  // Get unique responsible people and statuses for Actions filters
-  const allResponsiblePeople = [...new Set(actions.map(a => {
-    const responsibleIds = a.fields[ACTION_RESPONSIBLE_FIELD];
-    const responsibleId = responsibleIds?.[0];
-    return responsibleId ? peopleMap[responsibleId] : null;
-  }).filter(Boolean))].sort();
+  // Get unique responsible people and statuses for Actions filters (only for Current TPW Role)
+  const allResponsiblePeople = [...new Set(actions
+    .filter(a => (a.fields[ACTION_TPW_ROLE_FIELD] || '') === 'Current')
+    .map(a => {
+      const responsibleIds = a.fields[ACTION_RESPONSIBLE_FIELD];
+      const responsibleId = responsibleIds?.[0];
+      return responsibleId ? peopleMap[responsibleId] : null;
+    })
+    .filter(Boolean)
+  )].sort();
   
-  const allActionStatuses = [...new Set(actions.map(a => 
-    a.fields[ACTION_STATUS_FIELD]
-  ).filter(Boolean))].sort();
+  const allActionStatuses = [...new Set(actions
+    .filter(a => (a.fields[ACTION_TPW_ROLE_FIELD] || '') === 'Current')
+    .map(a => a.fields[ACTION_STATUS_FIELD])
+    .filter(Boolean)
+  )].sort();
 
   // Group actions by responsible if enabled
   const organizedActions = groupByResponsible
@@ -956,8 +972,10 @@ export default function Home() {
                 fontSize: '14px',
                 color: '#0369a1'
               }}>
-                <strong>Note:</strong> Start dates are estimated as 3 months before each deadline for visualization purposes.
-                Data synced from Airtable in real-time.
+                <strong>Note:</strong> {chartData.some(item => item.hasStartDate) 
+                  ? 'Milestones with start dates show actual duration. Others estimate 3 months before deadline.'
+                  : 'Start dates are estimated as 3 months before each deadline for visualization purposes.'}
+                {' '}Data synced from Airtable in real-time.
               </div>
             </>
           )}
