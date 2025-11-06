@@ -37,7 +37,8 @@ export default function Home() {
         console.log('Milestones count:', (data.milestones || []).length);
         console.log('Actions count:', (data.actions || []).length);
         console.log('People Map received:', data.peopleMap);
-        console.log('Sample action Responsible field:', data.actions?.[0]?.fields);
+        console.log('Sample milestone:', data.milestones?.[0]);
+        console.log('Sample action:', data.actions?.[0]);
         
         setConfig(data.config || {});
         setMilestones(data.milestones || []);
@@ -45,10 +46,10 @@ export default function Home() {
         setPeopleMap(data.peopleMap || {});
         setPrioritiesMap(data.prioritiesMap || {});
         
-        // Initialize milestone priority filter (all selected)
+        // Initialize milestone priority filter (all selected) - using processed data
         const allPriorities = new Set(
           (data.milestones || [])
-            .map(m => m.fields[data.config.milestone_priority_name_field || 'Priority']?.[0])
+            .map(m => m.priority)
             .filter(Boolean)
         );
         setSelectedPriorities(allPriorities);
@@ -56,53 +57,31 @@ export default function Home() {
         // Initialize milestone status filter (all selected)
         const allMilestoneStatuses = new Set(
           (data.milestones || [])
-            .map(m => m.fields[data.config.milestone_status_field || 'Status'])
+            .map(m => m.status)
             .filter(Boolean)
         );
         setSelectedStatuses(allMilestoneStatuses);
         
-        // Initialize milestone accountable filter (all selected, including Unassigned)
+        // Initialize milestone accountable filter (all selected)
         const allAccountable = new Set(
           (data.milestones || [])
-            .map(m => {
-              const accountableField = m.fields[data.config.milestone_accountable_field || 'Accountable'];
-              // Handle both linked record array and single select text
-              if (Array.isArray(accountableField) && accountableField.length > 0) {
-                const accountableId = accountableField[0];
-                return data.peopleMap[accountableId] || 'Unassigned';
-              } else if (typeof accountableField === 'string' && accountableField) {
-                return accountableField;
-              }
-              return 'Unassigned';
-            })
+            .map(m => m.accountable)
             .filter(Boolean)
         );
         setSelectedAccountable(allAccountable);
         
-        // Initialize action responsible filter (all selected, only Current TPW Role)
+        // Initialize action responsible filter (all selected)
         const allResponsible = new Set(
           (data.actions || [])
-            .filter(a => (a.fields[data.config.action_tpw_role_field || 'Current Status (TPW Role)'] || '') === 'Current')
-            .map(a => {
-              const responsibleField = a.fields[data.config.action_responsible_field || 'Responsible'];
-              // Handle both linked record array and single select text
-              if (Array.isArray(responsibleField) && responsibleField.length > 0) {
-                const responsibleId = responsibleField[0];
-                return data.peopleMap[responsibleId] || null;
-              } else if (typeof responsibleField === 'string' && responsibleField) {
-                return responsibleField;
-              }
-              return null;
-            })
+            .map(a => a.responsible)
             .filter(Boolean)
         );
         setSelectedResponsible(allResponsible);
         
-        // Initialize action status filter (all selected, only Current TPW Role)
+        // Initialize action status filter (all selected)
         const allActionStatuses = new Set(
           (data.actions || [])
-            .filter(a => (a.fields[data.config.action_tpw_role_field || 'Current Status (TPW Role)'] || '') === 'Current')
-            .map(a => a.fields[data.config.action_status_field || 'Status'])
+            .map(a => a.status)
             .filter(Boolean)
         );
         setSelectedActionStatuses(allActionStatuses);
@@ -133,44 +112,14 @@ export default function Home() {
     );
   }
 
-  // Get field names from config with fallbacks
-  const MILESTONE_NAME_FIELD = config.milestone_name_field || 'Name';
-  const MILESTONE_DEADLINE_FIELD = config.milestone_deadline_field || 'Deadline';
-  const MILESTONE_PRIORITY_ID_FIELD = config.milestone_priority_id_field || 'Priority area';
-  const MILESTONE_PRIORITY_NAME_FIELD = config.milestone_priority_name_field || 'Priority';
-  const MILESTONE_ACTIVITIES_FIELD = config.milestone_activities_field || 'Activities';
-  const MILESTONE_START_FIELD = config.milestone_start_field || 'Start Date';
-  const MILESTONE_ACCOUNTABLE_FIELD = config.milestone_accountable_field || 'Accountable';
-  const MILESTONE_STATUS_FIELD = config.milestone_status_field || 'Status';
-  
-  const ACTION_NAME_FIELD = config.action_name_field || 'Name';
-  const ACTION_RESPONSIBLE_FIELD = config.action_responsible_field || 'Responsible';
-  const ACTION_DEADLINE_FIELD = config.action_deadline_field || 'Deadline';
-  const ACTION_STATUS_FIELD = config.action_status_field || 'Status';
-  const ACTION_TPW_ROLE_FIELD = config.action_tpw_role_field || 'Current Status (TPW Role)';
-
-  // Process milestones data for Gantt chart
+  // Process milestones data for Gantt chart - use processed data directly
   const chartData = milestones.map(milestone => {
-    const name = milestone.fields[MILESTONE_NAME_FIELD] || 'Unnamed Activity';
-    const deadline = milestone.fields[MILESTONE_DEADLINE_FIELD] || '';
-    const startDateField = milestone.fields[MILESTONE_START_FIELD] || '';
-    
-    // Use priority name field directly instead of looking up by ID
-    const priority = milestone.fields[MILESTONE_PRIORITY_NAME_FIELD]?.[0] || 'No Priority';
-    
-    const status = milestone.fields[MILESTONE_STATUS_FIELD] || 'No Status';
-    
-    // Handle Accountable field - could be single select text OR linked record
-    const accountableField = milestone.fields[MILESTONE_ACCOUNTABLE_FIELD];
-    let accountable = 'Unassigned';
-    if (Array.isArray(accountableField) && accountableField.length > 0) {
-      // It's a linked record - look up in peopleMap
-      const accountableId = accountableField[0];
-      accountable = peopleMap[accountableId] || 'Unassigned';
-    } else if (typeof accountableField === 'string' && accountableField) {
-      // It's a single select text field - use directly
-      accountable = accountableField;
-    }
+    const name = milestone.name || 'Unnamed Activity';
+    const deadline = milestone.deadline || '';
+    const startDateField = milestone.startDate || '';
+    const priority = milestone.priority || 'No Priority';
+    const status = milestone.status || 'No Status';
+    const accountable = milestone.accountable || 'Unassigned';
     
     // Use actual start date if available, otherwise estimate
     let startDate;
@@ -197,38 +146,21 @@ export default function Home() {
     };
   });
   
-  // Get unique values for filters (needed before console logs)
-  const priorities = [...new Set(milestones.map(m => 
-    m.fields[MILESTONE_PRIORITY_NAME_FIELD]?.[0]
-  ).filter(Boolean))].sort();
-
-  const milestoneStatuses = [...new Set(milestones.map(m => 
-    m.fields[MILESTONE_STATUS_FIELD]
-  ).filter(Boolean))].sort();
-
-  const accountablePeople = [...new Set(milestones.map(m => {
-    const accountableField = m.fields[MILESTONE_ACCOUNTABLE_FIELD];
-    // Handle both linked record array and single select text
-    if (Array.isArray(accountableField) && accountableField.length > 0) {
-      const accountableId = accountableField[0];
-      return peopleMap[accountableId] || 'Unassigned';
-    } else if (typeof accountableField === 'string' && accountableField) {
-      return accountableField;
-    }
-    return 'Unassigned';
-  }).filter(Boolean))].sort();
+  // Get unique values for filters
+  const priorities = [...new Set(milestones.map(m => m.priority).filter(Boolean))].sort();
+  const milestoneStatuses = [...new Set(milestones.map(m => m.status).filter(Boolean))].sort();
+  const accountablePeople = [...new Set(milestones.map(m => m.accountable).filter(Boolean))].sort();
 
   // Debug logging
   console.log('=== GANTT CHART DEBUG ===');
   console.log('Total milestones:', chartData.length);
   console.log('Sample milestone:', chartData[0]);
-  console.log('All priorities:', [...new Set(chartData.map(m => m.priority))]);
-  console.log('All accountable people:', [...new Set(chartData.map(m => m.accountable))]);
-  console.log('All statuses:', [...new Set(chartData.map(m => m.status))]);
+  console.log('All priorities:', priorities);
+  console.log('All accountable people:', accountablePeople);
+  console.log('All statuses:', milestoneStatuses);
   console.log('Selected priorities:', Array.from(selectedPriorities));
   console.log('Selected accountable:', Array.from(selectedAccountable));
   console.log('Selected statuses:', Array.from(selectedStatuses));
-  console.log('accountablePeople array:', accountablePeople);
   
   const filteredChartData = chartData
     .filter(item => item.deadline)
@@ -347,52 +279,24 @@ export default function Home() {
     return date.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
   };
 
-  // Process actions data
-  const processedActions = actions.map(action => {
-    // Handle Responsible field - could be single select text OR linked record
-    const responsibleField = action.fields[ACTION_RESPONSIBLE_FIELD];
-    let responsibleName = 'Unassigned';
-    if (Array.isArray(responsibleField) && responsibleField.length > 0) {
-      // It's a linked record - look up in peopleMap
-      const responsibleId = responsibleField[0];
-      responsibleName = peopleMap[responsibleId] || 'Unknown';
-    } else if (typeof responsibleField === 'string' && responsibleField) {
-      // It's a single select text field - use directly
-      responsibleName = responsibleField;
-    }
-    
-    const tpwRole = action.fields[ACTION_TPW_ROLE_FIELD] || '';
-    
-    return {
-      id: action.id,
-      name: action.fields[ACTION_NAME_FIELD] || 'Unnamed Action',
-      responsible: responsibleName,
-      deadline: action.fields[ACTION_DEADLINE_FIELD] || '',
-      status: action.fields[ACTION_STATUS_FIELD] || 'No Status',
-      tpwRole: tpwRole
-    };
-  });
+  // Process actions data - use processed data directly
+  const processedActions = actions.map(action => ({
+    id: action.id,
+    name: action.name || 'Unnamed Action',
+    responsible: action.responsible || 'Unassigned',
+    deadline: action.deadline || '',
+    status: action.status || 'No Status',
+    tpwRole: action.tpwRole || ''
+  }));
 
   console.log('=== ACTIONS DEBUG ===');
   console.log('Total actions:', processedActions.length);
-  console.log('Actions with TPW Role "Current":', processedActions.filter(a => a.tpwRole === 'Current').length);
   console.log('Sample action:', processedActions[0]);
-  console.log('Sample action RAW Responsible field:', actions[0]?.fields[ACTION_RESPONSIBLE_FIELD]);
-  console.log('Type of Responsible field:', typeof actions[0]?.fields[ACTION_RESPONSIBLE_FIELD]);
-  console.log('Is Responsible field an array?:', Array.isArray(actions[0]?.fields[ACTION_RESPONSIBLE_FIELD]));
   console.log('All responsible people:', [...new Set(processedActions.map(a => a.responsible))]);
-  console.log('Unknown actions (first 3):', processedActions.filter(a => a.responsible === 'Unknown').slice(0, 3).map(a => ({
-    name: a.name,
-    responsibleFieldRaw: actions.find(act => act.id === a.id)?.fields[ACTION_RESPONSIBLE_FIELD]
-  })));
-  console.log('Adebayo actions:', processedActions.filter(a => a.responsible.toLowerCase().includes('adebayo') || a.responsible.toLowerCase().includes('obasaju') || a.responsible.toLowerCase().includes('bayo')));
-  console.log('People Map (first 3):', Object.entries(peopleMap).slice(0, 3));
-  console.log('Does peopleMap have recrPq94c7VibDBk8?:', peopleMap['recrPq94c7VibDBk8']);
   console.log('Selected Responsible:', Array.from(selectedResponsible));
   
   const filteredActions = processedActions
     .filter(action => action.name !== 'Unnamed Action')
-    .filter(action => action.tpwRole === 'Current') // Only show actions where TPW Role is 'Current'
     .filter(action => selectedResponsible.has(action.responsible))
     .filter(action => selectedActionStatuses.has(action.status));
 
@@ -403,34 +307,17 @@ export default function Home() {
     return new Date(a.deadline) - new Date(b.deadline);
   });
 
-  // Get unique responsible people and statuses for Actions filters (only for Current TPW Role)
-  const allResponsiblePeople = [...new Set(actions
-    .filter(a => (a.fields[ACTION_TPW_ROLE_FIELD] || '') === 'Current')
-    .map(a => {
-      const responsibleField = a.fields[ACTION_RESPONSIBLE_FIELD];
-      // Handle both linked record array and single select text
-      if (Array.isArray(responsibleField) && responsibleField.length > 0) {
-        const responsibleId = responsibleField[0];
-        return peopleMap[responsibleId] || null;
-      } else if (typeof responsibleField === 'string' && responsibleField) {
-        return responsibleField;
-      }
-      return null;
-    })
-    .filter(Boolean)
-  )].sort();
-  
-  const allActionStatuses = [...new Set(actions
-    .filter(a => (a.fields[ACTION_TPW_ROLE_FIELD] || '') === 'Current')
-    .map(a => a.fields[ACTION_STATUS_FIELD])
-    .filter(Boolean)
-  )].sort();
+  // Get unique responsible people and statuses for Actions filters
+  const allResponsiblePeople = [...new Set(actions.map(a => a.responsible).filter(Boolean))].sort();
+  const allActionStatuses = [...new Set(actions.map(a => a.status).filter(Boolean))].sort();
 
   // Status color mapping
   const statusColors = {
     'Not started': '#94a3b8', // gray
     'In progress': '#3b82f6', // blue  
     'Complete': '#10b981', // green
+    'To do': '#f59e0b', // orange
+    'Done': '#10b981', // green
     'On hold': '#f59e0b', // orange
     'Cancelled': '#ef4444' // red
   };
