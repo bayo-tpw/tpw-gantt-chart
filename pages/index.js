@@ -172,14 +172,16 @@ export default function Home() {
   });
   
   // Debug logging
+  console.log('=== GANTT CHART DEBUG ===');
   console.log('Total milestones:', chartData.length);
   console.log('Sample milestone:', chartData[0]);
   console.log('All priorities:', [...new Set(chartData.map(m => m.priority))]);
-  console.log('All accountable:', [...new Set(chartData.map(m => m.accountable))]);
+  console.log('All accountable people:', [...new Set(chartData.map(m => m.accountable))]);
   console.log('All statuses:', [...new Set(chartData.map(m => m.status))]);
   console.log('Selected priorities:', Array.from(selectedPriorities));
   console.log('Selected accountable:', Array.from(selectedAccountable));
   console.log('Selected statuses:', Array.from(selectedStatuses));
+  console.log('accountablePeople array:', accountablePeople);
   
   const filteredChartData = chartData
     .filter(item => item.deadline)
@@ -334,7 +336,8 @@ export default function Home() {
   console.log('Total actions:', processedActions.length);
   console.log('Actions with TPW Role "Current":', processedActions.filter(a => a.tpwRole === 'Current').length);
   console.log('Sample action:', processedActions[0]);
-  console.log('Adebayo actions:', processedActions.filter(a => a.responsible.includes('Adebayo') || a.responsible.includes('Obasaju')));
+  console.log('All responsible people:', [...new Set(processedActions.map(a => a.responsible))]);
+  console.log('Adebayo actions:', processedActions.filter(a => a.responsible.includes('Adebayo') || a.responsible.includes('Obasaju') || a.responsible.includes('Bayo')));
   console.log('People Map:', peopleMap);
   console.log('Selected Responsible:', Array.from(selectedResponsible));
   
