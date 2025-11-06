@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Head from 'next/head';
 
 export default function GanttChart() {
   const [data, setData] = useState({
@@ -10,6 +11,7 @@ export default function GanttChart() {
   });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('gantt');
+  const [expandedNotes, setExpandedNotes] = useState(new Set());
 
   const { milestones, actions, peopleMap, prioritiesMap, config } = data;
 
@@ -26,6 +28,16 @@ export default function GanttChart() {
         setLoading(false);
       });
   }, []);
+
+  const toggleNoteExpansion = (actionId) => {
+    const newSet = new Set(expandedNotes);
+    if (newSet.has(actionId)) {
+      newSet.delete(actionId);
+    } else {
+      newSet.add(actionId);
+    }
+    setExpandedNotes(newSet);
+  };
 
   // Process milestones
   const processedChartData = milestones.map(milestone => {
@@ -81,143 +93,349 @@ export default function GanttChart() {
 
   if (loading) {
     return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <h2>Loading...</h2>
-      </div>
+      <>
+        <Head>
+          <style>{`
+            body { 
+              margin: 0 !important; 
+              padding: 0 !important; 
+              width: 100vw !important;
+              font-family: Arial, sans-serif !important;
+            }
+            #__next { 
+              width: 100vw !important; 
+              margin: 0 !important; 
+              padding: 0 !important; 
+            }
+            * { 
+              box-sizing: border-box !important; 
+            }
+          `}</style>
+        </Head>
+        <div style={{ 
+          width: '100vw', 
+          height: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: '#f8f9fa',
+          margin: 0,
+          padding: 0
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '40px', 
+            borderRadius: '8px', 
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' 
+          }}>
+            <h2 style={{ fontSize: '24px', marginBottom: '10px', margin: '0 0 10px 0' }}>Loading...</h2>
+            <p style={{ color: '#666', margin: 0 }}>Fetching data from Airtable</p>
+          </div>
+        </div>
+      </>
     );
   }
 
-  const containerStyle = {
-    fontFamily: 'Arial, sans-serif',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '20px',
-    backgroundColor: '#f8f9fa'
-  };
-
-  const headerStyle = {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    marginBottom: '20px',
-    color: '#333'
-  };
-
-  const tabContainerStyle = {
-    display: 'flex',
-    marginBottom: '20px',
-    borderBottom: '2px solid #ddd'
-  };
-
-  const tabStyle = {
-    padding: '10px 20px',
-    border: 'none',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    fontSize: '16px',
-    borderBottom: '2px solid transparent'
-  };
-
-  const activeTabStyle = {
-    ...tabStyle,
-    borderBottom: '2px solid #007bff',
-    color: '#007bff',
-    fontWeight: 'bold'
-  };
-
-  const cardStyle = {
-    backgroundColor: 'white',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    padding: '15px',
-    marginBottom: '15px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-  };
-
-  const cardTitleStyle = {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    marginBottom: '8px',
-    color: '#333'
-  };
-
-  const cardDetailStyle = {
-    fontSize: '14px',
-    color: '#666',
-    marginBottom: '4px'
-  };
-
   return (
-    <div style={containerStyle}>
-      <h1 style={headerStyle}>TPW Regional Delivery Action Plan</h1>
+    <>
+      <Head>
+        <style>{`
+          body { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            width: 100vw !important;
+            font-family: Arial, sans-serif !important;
+            background-color: #f8f9fa !important;
+          }
+          #__next { 
+            width: 100vw !important; 
+            margin: 0 !important; 
+            padding: 0 !important; 
+          }
+          * { 
+            box-sizing: border-box !important; 
+          }
+        `}</style>
+      </Head>
       
-      {/* Tabs */}
-      <div style={tabContainerStyle}>
-        <button
-          style={activeTab === 'gantt' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('gantt')}
-        >
-          Gantt Chart ({processedChartData.length})
-        </button>
-        <button
-          style={activeTab === 'actions' ? activeTabStyle : tabStyle}
-          onClick={() => setActiveTab('actions')}
-        >
-          Actions ({processedActions.length})
-        </button>
+      <div style={{
+        width: '100vw',
+        minHeight: '100vh',
+        padding: '30px',
+        backgroundColor: '#f8f9fa',
+        margin: 0
+      }}>
+        <h1 style={{
+          fontSize: '32px',
+          fontWeight: 'bold',
+          marginBottom: '40px',
+          color: '#333',
+          textAlign: 'center',
+          width: '100%'
+        }}>
+          TPW Regional Delivery Action Plan
+        </h1>
+        
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginBottom: '40px',
+          width: '100%'
+        }}>
+          <div style={{
+            display: 'flex',
+            backgroundColor: '#e9ecef',
+            borderRadius: '12px',
+            padding: '6px',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}>
+            <button
+              style={{
+                padding: '14px 28px',
+                border: 'none',
+                background: activeTab === 'gantt' ? 'white' : 'transparent',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: activeTab === 'gantt' ? 'bold' : '500',
+                borderRadius: '8px',
+                color: activeTab === 'gantt' ? '#007bff' : '#666',
+                boxShadow: activeTab === 'gantt' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
+              }}
+              onClick={() => setActiveTab('gantt')}
+            >
+              Gantt Chart ({processedChartData.length})
+            </button>
+            <button
+              style={{
+                padding: '14px 28px',
+                border: 'none',
+                background: activeTab === 'actions' ? 'white' : 'transparent',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: activeTab === 'actions' ? 'bold' : '500',
+                borderRadius: '8px',
+                color: activeTab === 'actions' ? '#007bff' : '#666',
+                boxShadow: activeTab === 'actions' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'
+              }}
+              onClick={() => setActiveTab('actions')}
+            >
+              Actions ({processedActions.length})
+            </button>
+          </div>
+        </div>
+
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          width: '100%'
+        }}>
+          {activeTab === 'gantt' && (
+            <div>
+              <h2 style={{
+                fontSize: '28px',
+                fontWeight: 'bold',
+                marginBottom: '30px',
+                color: '#333',
+                borderBottom: '3px solid #007bff',
+                paddingBottom: '12px',
+                textAlign: 'center'
+              }}>
+                Milestones
+              </h2>
+              {processedChartData.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '80px 20px',
+                  color: '#666',
+                  background: 'white',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                }}>
+                  <h3 style={{ fontSize: '24px', marginBottom: '12px', color: '#333' }}>No milestones found</h3>
+                  <p style={{ fontSize: '16px' }}>Check your Airtable configuration</p>
+                </div>
+              ) : (
+                processedChartData.map(item => (
+                  <div key={item.id} style={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '12px',
+                    padding: '24px',
+                    marginBottom: '24px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                  }}>
+                    <div style={{
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      marginBottom: '16px',
+                      color: '#333',
+                      lineHeight: '1.4'
+                    }}>
+                      {item.name}
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '12px'
+                    }}>
+                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Priority:</span>
+                        <span>{item.priority}</span>
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Status:</span>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          borderRadius: '16px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          textTransform: 'uppercase',
+                          backgroundColor: item.status.toLowerCase().includes('complete') ? '#e8f5e8' : 
+                                         item.status.toLowerCase().includes('progress') ? '#e3f2fd' : '#f8f9fa',
+                          color: item.status.toLowerCase().includes('complete') ? '#2e7d32' : 
+                                item.status.toLowerCase().includes('progress') ? '#1976d2' : '#6c757d'
+                        }}>
+                          {item.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Accountable:</span>
+                        <span>{item.accountable}</span>
+                      </div>
+                      {item.deadline && (
+                        <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Deadline:</span>
+                          <span>{new Date(item.deadline).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'actions' && (
+            <div>
+              <h2 style={{
+                fontSize: '28px',
+                fontWeight: 'bold',
+                marginBottom: '30px',
+                color: '#333',
+                borderBottom: '3px solid #007bff',
+                paddingBottom: '12px',
+                textAlign: 'center'
+              }}>
+                Actions (Director View Only)
+              </h2>
+              {processedActions.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '80px 20px',
+                  color: '#666',
+                  background: 'white',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                }}>
+                  <h3 style={{ fontSize: '24px', marginBottom: '12px', color: '#333' }}>No actions found</h3>
+                  <p style={{ fontSize: '16px' }}>No actions have Director View = true</p>
+                </div>
+              ) : (
+                processedActions.map(action => (
+                  <div key={action.id} style={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '12px',
+                    padding: '24px',
+                    marginBottom: '24px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                  }}>
+                    <div style={{
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      marginBottom: '16px',
+                      color: '#333',
+                      lineHeight: '1.4'
+                    }}>
+                      {action.name}
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '12px'
+                    }}>
+                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Responsible:</span>
+                        <span>{action.responsible}</span>
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Status:</span>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          borderRadius: '16px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          textTransform: 'uppercase',
+                          backgroundColor: action.status.toLowerCase().includes('complete') ? '#e8f5e8' : 
+                                         action.status.toLowerCase().includes('progress') ? '#e3f2fd' : '#f8f9fa',
+                          color: action.status.toLowerCase().includes('complete') ? '#2e7d32' : 
+                                action.status.toLowerCase().includes('progress') ? '#1976d2' : '#6c757d'
+                        }}>
+                          {action.status}
+                        </span>
+                      </div>
+                      {action.deadline && (
+                        <div style={{ fontSize: '14px', color: '#666', display: 'flex', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 'bold', color: '#333', marginRight: '8px', minWidth: '90px' }}>Deadline:</span>
+                          <span>{new Date(action.deadline).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+                    {action.notes && (
+                      <div style={{
+                        marginTop: '20px',
+                        borderTop: '1px solid #eee',
+                        paddingTop: '16px'
+                      }}>
+                        <button
+                          style={{
+                            background: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '500'
+                          }}
+                          onClick={() => toggleNoteExpansion(action.id)}
+                        >
+                          {expandedNotes.has(action.id) ? 'Hide Notes' : 'Show Notes'}
+                        </button>
+                        {expandedNotes.has(action.id) && (
+                          <div style={{
+                            marginTop: '12px',
+                            padding: '16px',
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '8px',
+                            borderLeft: '4px solid #007bff',
+                            color: '#555',
+                            lineHeight: '1.6'
+                          }}>
+                            {action.notes}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Content */}
-      {activeTab === 'gantt' && (
-        <div>
-          <h2 style={{ fontSize: '20px', marginBottom: '15px' }}>Milestones</h2>
-          {processedChartData.length === 0 ? (
-            <p>No milestones found.</p>
-          ) : (
-            processedChartData.map(item => (
-              <div key={item.id} style={cardStyle}>
-                <div style={cardTitleStyle}>{item.name}</div>
-                <div style={cardDetailStyle}>Priority: {item.priority}</div>
-                <div style={cardDetailStyle}>Status: {item.status}</div>
-                <div style={cardDetailStyle}>Accountable: {item.accountable}</div>
-                {item.deadline && (
-                  <div style={cardDetailStyle}>
-                    Deadline: {new Date(item.deadline).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {activeTab === 'actions' && (
-        <div>
-          <h2 style={{ fontSize: '20px', marginBottom: '15px' }}>
-            Actions (Director View Only)
-          </h2>
-          {processedActions.length === 0 ? (
-            <p>No actions found with Director View = true.</p>
-          ) : (
-            processedActions.map(action => (
-              <div key={action.id} style={cardStyle}>
-                <div style={cardTitleStyle}>{action.name}</div>
-                <div style={cardDetailStyle}>Responsible: {action.responsible}</div>
-                <div style={cardDetailStyle}>Status: {action.status}</div>
-                {action.deadline && (
-                  <div style={cardDetailStyle}>
-                    Deadline: {new Date(action.deadline).toLocaleDateString()}
-                  </div>
-                )}
-                {action.notes && (
-                  <div style={{ ...cardDetailStyle, marginTop: '8px', fontStyle: 'italic' }}>
-                    Notes: {action.notes}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
