@@ -92,6 +92,7 @@ export default async function handler(req, res) {
     const ACTION_STATUS_FIELD = getField('action_status_field', 'Status');
     const ACTION_TPW_ROLE_FIELD = getField('action_tpw_role_field', 'Current Status (TPW Role)');
     const ACTION_DIRECTOR_VIEW_FIELD = getField('action_director_view_field', 'Director View');
+    const ACTION_NOTES_FIELD = getField('action_notes_field', 'Notes');
 
     console.log('API: Using field mappings - Milestone name:', MILESTONE_NAME_FIELD, 'Action director view:', ACTION_DIRECTOR_VIEW_FIELD);
 
@@ -118,7 +119,8 @@ export default async function handler(req, res) {
         ACTION_DEADLINE_FIELD,
         ACTION_STATUS_FIELD,
         ACTION_TPW_ROLE_FIELD,
-        ACTION_DIRECTOR_VIEW_FIELD
+        ACTION_DIRECTOR_VIEW_FIELD,
+        getField('action_notes_field', 'Notes')
       ]
     }));
     console.log('API: Actions fetched:', actionsData.length);
@@ -180,7 +182,8 @@ export default async function handler(req, res) {
           deadline: record.fields[ACTION_DEADLINE_FIELD] || '',
           status: record.fields[ACTION_STATUS_FIELD] || '',
           tpwRole: record.fields[ACTION_TPW_ROLE_FIELD] || '',
-          directorView: record.fields[ACTION_DIRECTOR_VIEW_FIELD] || false
+          directorView: record.fields[ACTION_DIRECTOR_VIEW_FIELD] || false,
+          notes: record.fields[ACTION_NOTES_FIELD] || ''
         };
       });
 
