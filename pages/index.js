@@ -1,3 +1,7 @@
+// VERSION: 2.5 - Working Version (Pre Director View/Notes)
+// LAST UPDATED: 2025-11-06
+// FEATURES: Dynamic config, Status/Accountable filters, TPW Role filter, Proper Tailwind styling
+
 import { useState, useEffect } from 'react';
 
 export default function GanttChart() {
@@ -9,405 +13,791 @@ export default function GanttChart() {
     config: {}
   });
   const [loading, setLoading] = useState(true);
+  
+  // Gantt Chart State
+  const [selectedPriorities, setSelectedPriorities] = useState([]);
+  const [selectedAccountable, setSelectedAccountable] = useState([]);
+  const [selectedStatuses, setSelectedStatuses] = useState([]);
+  const [groupByPriority, setGroupByPriority] = useState(true);
+  const [sortByDeadline, setSortByDeadline] = useState(false);
+  
+  // Actions Table State  
+  const [selectedResponsible, setSelectedResponsible] = useState([]);
+  const [selectedActionStatuses, setSelectedActionStatuses] = useState([]);
+  const [groupByResponsible, setGroupByResponsible] = useState(true);
+  
+  // Tab state
   const [activeTab, setActiveTab] = useState('gantt');
-  const [expandedNotes, setExpandedNotes] = useState(new Set());
 
   const { milestones, actions, peopleMap, prioritiesMap, config } = data;
 
-  useEffect(() => {
-    // Add CSS directly to the document head to override any conflicts
-    const style = document.createElement('style');
-    style.textContent = `
-      body, html {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-        font-family: Arial, sans-serif !important;
-        background: #f5f5f5 !important;
-      }
-      #__next {
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      .app-container {
-        width: 100% !important;
-        max-width: none !important;
-        margin: 0 !important;
-        padding: 20px !important;
-        box-sizing: border-box !important;
-      }
-      .content-wrapper {
-        max-width: 1200px !important;
-        margin: 0 auto !important;
-        width: 100% !important;
-      }
-    `;
-    document.head.appendChild(style);
+  // Dynamic field mapping from Config table
+  const MILESTONE_NAME_FIELD = config.milestone_name_field || 'Name';
+  const MILESTONE_DEADLINE_FIELD = config.milestone_deadline_field || 'Deadline';
+  const MILESTONE_PRIORITY_ID_FIELD = config.milestone_priority_id_field || 'Priority area';
+  const MILESTONE_PRIORITY_NAME_FIELD = config.milestone_priority_name_field || 'Priority';
+  const MILESTONE_START_FIELD = config.milestone_start_field || 'Start Date';
+  const MILESTONE_ACCOUNTABLE_FIELD = config.milestone_accountable_field || 'Accountable';
+  const MILESTONE_STATUS_FIELD = config.milestone_status_field || 'Status';
+  
+  const ACTION_NAME_FIELD = config.action_name_field || 'Name';
+  const ACTION_RESPONSIBLE_FIELD = config.action_responsible_field || 'Responsible';
+  const ACTION_DEADLINE_FIELD = config.action_deadline_field || 'Deadline';
+  const ACTION_STATUS_FIELD = config.action_status_field || 'Status';
+  const ACTION_TPW_ROLE_FIELD = config.action_tpw_role_field || 'Current Status (TPW Role)';
 
+  useEffect(() => {
     fetch('/api/airtable')
       .then(response => response.json())
       .then(data => {
-        console.log('Data loaded successfully');
         setData(data);
+        
+        // Initialize filters
+        const priorities = [...new Set(data.milestones
+          .map(m => {
+            const priorityName = m.fields[data.config?.milestone_priority_name_field || 'Priority'];
+            if (priorityName && Array.isArray(priorityName) && priorityName.length > 0) {
+              return priorityName[0];
+            } else if (typeof priorityName === 'string') {
+              return priorityName;
+            }
+            const priorityIds = m.fields[data.config?.milestone_priority_id_field || 'Priority area'];
+            if (priorityIds && priorityIds.length > 0) {
+              return data.prioritiesMap[priorityIds[0]] || 'Unknown';
+            }
+            return 'Unknown';
+          })
+          .filter(Boolean)
+        )];
+        
+        const milestoneStatuses = [...new Set(data.milestones
+          .map(m => m.fields[data.config?.milestone_status_field || 'Status'])
+          .filter(Boolean)
+        )];
+        
+        const accountablePeople = [...new Set(data.milestones
+          .map(m => {
+            const accountableField = m.fields[data.config?.milestone_accountable_field || 'Accountable'];
+            if (Array.isArray(accountableField) && accountableField.length > 0) {
+              return data.peopleMap[accountableField[0]] || 'Unknown';
+            } else if (typeof accountableField === 'string') {
+              return accountableField;
+            }
+            return 'Unassigned';
+          })
+          .filter(Boolean)
+        )];
+
+        setSelectedPriorities(priorities);
+        setSelectedStatuses(milestoneStatuses);
+        setSelectedAccountable(accountablePeople);
+        
+        // Process actions
+        const currentActions = data.actions.filter(action => {
+          const tpwRole = action.fields[data.config?.action_tpw_role_field || 'Current Status (TPW Role)'];
+          return tpwRole === 'Current';
+        });
+        
+        const responsiblePeople = [...new Set(currentActions
+          .map(action => {
+            const responsibleField = action.fields[data.config?.action_responsible_field || 'Responsible'];
+            if (Array.isArray(responsibleField) && responsibleField.length > 0) {
+              return data.peopleMap[responsibleField[0]] || 'Unknown';
+            } else if (typeof responsibleField === 'string') {
+              return responsibleField;
+            }
+            return 'Unknown';
+          })
+          .filter(Boolean)
+        )];
+        
+        const actionStatuses = [...new Set(currentActions
+          .map(action => action.fields[data.config?.action_status_field || 'Status'])
+          .filter(Boolean)
+        )];
+        
+        setSelectedResponsible(responsiblePeople);
+        setSelectedActionStatuses(actionStatuses);
         setLoading(false);
       })
       .catch(error => {
         console.error('Error fetching data:', error);
         setLoading(false);
       });
-
-    return () => {
-      // Cleanup
-      if (style.parentNode) {
-        style.parentNode.removeChild(style);
-      }
-    };
   }, []);
 
-  const toggleNoteExpansion = (actionId) => {
-    const newSet = new Set(expandedNotes);
-    if (newSet.has(actionId)) {
-      newSet.delete(actionId);
-    } else {
-      newSet.add(actionId);
-    }
-    setExpandedNotes(newSet);
+  // Toggle functions
+  const togglePriority = (priority) => {
+    setSelectedPriorities(prev =>
+      prev.includes(priority)
+        ? prev.filter(p => p !== priority)
+        : [...prev, priority]
+    );
   };
 
-  // Process milestones
+  const toggleAccountable = (person) => {
+    setSelectedAccountable(prev =>
+      prev.includes(person)
+        ? prev.filter(p => p !== person)
+        : [...prev, person]
+    );
+  };
+
+  const toggleStatus = (status) => {
+    setSelectedStatuses(prev =>
+      prev.includes(status)
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const toggleResponsible = (person) => {
+    setSelectedResponsible(prev =>
+      prev.includes(person)
+        ? prev.filter(p => p !== person)
+        : [...prev, person]
+    );
+  };
+
+  const toggleActionStatus = (status) => {
+    setSelectedActionStatuses(prev =>
+      prev.includes(status)
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  // Process chart data
   const processedChartData = milestones.map(milestone => {
-    const priorityName = milestone.fields?.[config?.milestone_priority_name_field || 'Priority'];
-    let priority = 'Unknown';
-    if (priorityName) {
-      priority = Array.isArray(priorityName) ? priorityName[0] : priorityName;
+    const priorityName = milestone.fields[MILESTONE_PRIORITY_NAME_FIELD];
+    let priority;
+    if (priorityName && Array.isArray(priorityName) && priorityName.length > 0) {
+      priority = priorityName[0];
+    } else if (typeof priorityName === 'string') {
+      priority = priorityName;
+    } else {
+      const priorityIds = milestone.fields[MILESTONE_PRIORITY_ID_FIELD];
+      priority = (priorityIds && priorityIds.length > 0) ? prioritiesMap[priorityIds[0]] || 'Unknown' : 'Unknown';
     }
 
-    const accountableField = milestone.fields?.[config?.milestone_accountable_field || 'Accountable'];
-    let accountable = 'Unknown';
+    const accountableField = milestone.fields[MILESTONE_ACCOUNTABLE_FIELD];
+    let accountable;
     if (Array.isArray(accountableField) && accountableField.length > 0) {
       accountable = peopleMap[accountableField[0]] || 'Unknown';
     } else if (typeof accountableField === 'string') {
       accountable = accountableField;
+    } else {
+      accountable = 'Unassigned';
+    }
+
+    const status = milestone.fields[MILESTONE_STATUS_FIELD] || 'Unknown';
+    const deadline = milestone.fields[MILESTONE_DEADLINE_FIELD];
+    
+    let startDate;
+    const actualStartDate = milestone.fields[MILESTONE_START_FIELD];
+    if (actualStartDate) {
+      startDate = actualStartDate;
+    } else if (deadline) {
+      const deadlineDate = new Date(deadline);
+      deadlineDate.setMonth(deadlineDate.getMonth() - 3);
+      startDate = deadlineDate.toISOString().split('T')[0];
+    } else {
+      startDate = new Date().toISOString().split('T')[0];
     }
 
     return {
       id: milestone.id,
-      name: milestone.fields?.[config?.milestone_name_field || 'Name'] || 'Untitled',
+      name: milestone.fields[MILESTONE_NAME_FIELD] || 'Untitled',
       priority,
       accountable,
-      status: milestone.fields?.[config?.milestone_status_field || 'Status'] || 'Unknown',
-      deadline: milestone.fields?.[config?.milestone_deadline_field || 'Deadline']
+      status,
+      startDate,
+      deadline
     };
   });
 
-  // Process actions
+  // Filter chart data
+  const filteredChartData = processedChartData.filter(item => {
+    return selectedPriorities.includes(item.priority) &&
+           selectedAccountable.includes(item.accountable) &&
+           selectedStatuses.includes(item.status);
+  });
+
+  // Sort chart data
+  let displayData = [...filteredChartData];
+  if (sortByDeadline) {
+    displayData.sort((a, b) => {
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline) - new Date(b.deadline);
+    });
+  }
+
+  // Process actions data
   const processedActions = actions
     .filter(action => {
-      const tpwRole = action.fields?.[config?.action_tpw_role_field || 'Current Status (TPW Role)'];
-      const directorView = action.fields?.[config?.action_director_view_field || 'Director View'];
-      return tpwRole === 'Current' && (directorView === true || directorView === 'true' || directorView === 1);
+      const tpwRole = action.fields[ACTION_TPW_ROLE_FIELD];
+      return tpwRole === 'Current';
     })
     .map(action => {
-      const responsibleField = action.fields?.[config?.action_responsible_field || 'Responsible'];
-      let responsible = 'Unknown';
+      const responsibleField = action.fields[ACTION_RESPONSIBLE_FIELD];
+      let responsible;
       if (Array.isArray(responsibleField) && responsibleField.length > 0) {
         responsible = peopleMap[responsibleField[0]] || 'Unknown';
       } else if (typeof responsibleField === 'string') {
         responsible = responsibleField;
+      } else {
+        responsible = 'Unknown';
       }
 
       return {
         id: action.id,
-        name: action.fields?.[config?.action_name_field || 'Name'] || 'Untitled',
+        name: action.fields[ACTION_NAME_FIELD] || 'Untitled',
         responsible,
-        deadline: action.fields?.[config?.action_deadline_field || 'Deadline'] || '',
-        status: action.fields?.[config?.action_status_field || 'Status'] || 'Unknown',
-        notes: action.fields?.[config?.action_notes_field || 'Notes'] || ''
+        deadline: action.fields[ACTION_DEADLINE_FIELD] || '',
+        status: action.fields[ACTION_STATUS_FIELD] || 'Unknown'
       };
     });
 
+  // Filter actions
+  const filteredActions = processedActions.filter(action => {
+    return selectedResponsible.includes(action.responsible) &&
+           selectedActionStatuses.includes(action.status);
+  });
+
+  // Sort actions by deadline
+  const sortedActions = [...filteredActions].sort((a, b) => {
+    if (!a.deadline) return 1;
+    if (!b.deadline) return -1;
+    return new Date(a.deadline) - new Date(b.deadline);
+  });
+
+  // Group actions
+  let groupedActions = {};
+  if (groupByResponsible) {
+    groupedActions = sortedActions.reduce((groups, action) => {
+      const key = action.responsible || 'Unknown';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(action);
+      return groups;
+    }, {});
+  }
+
+  // Helper functions
+  const getPriorityColor = (priority) => {
+    const colors = {
+      '2. Grant making': '#10b981',
+      '3. Capability support and development': '#eab308',
+      '4. Learning and Impact': '#8b5cf6',
+      '1. Governance and Leadership': '#ef4444'
+    };
+    return colors[priority] || '#6b7280';
+  };
+
+  const getStatusBadgeColor = (status) => {
+    const colors = {
+      'Not started': 'bg-gray-100 text-gray-800',
+      'In progress': 'bg-blue-100 text-blue-800',
+      'Complete': 'bg-green-100 text-green-800',
+      'On hold': 'bg-orange-100 text-orange-800',
+      'Cancelled': 'bg-red-100 text-red-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const generateTimeline = () => {
+    const months = [];
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 2);
+    
+    for (let i = 0; i < 24; i++) {
+      const date = new Date(startDate);
+      date.setMonth(startDate.getMonth() + i);
+      months.push({
+        label: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        date: date
+      });
+    }
+    return months;
+  };
+
+  const timelineMonths = generateTimeline();
+
+  const getBarStyle = (startDate, deadline) => {
+    if (!deadline) return { display: 'none' };
+    
+    const start = new Date(startDate);
+    const end = new Date(deadline);
+    const timelineStart = timelineMonths[0].date;
+    const timelineEnd = new Date(timelineMonths[timelineMonths.length - 1].date);
+    timelineEnd.setMonth(timelineEnd.getMonth() + 1);
+    
+    const totalDuration = timelineEnd - timelineStart;
+    const itemStart = start - timelineStart;
+    const itemDuration = end - start;
+    
+    const leftPercent = Math.max(0, (itemStart / totalDuration) * 100);
+    const widthPercent = Math.min(100 - leftPercent, (itemDuration / totalDuration) * 100);
+    
+    return {
+      left: `${leftPercent}%`,
+      width: `${Math.max(2, widthPercent)}%`
+    };
+  };
+
   if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        width: '100vw',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        background: '#f5f5f5'
-      }}>
-        <div style={{
-          background: 'white',
-          padding: '30px',
-          borderRadius: '10px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ margin: '0 0 10px 0', fontSize: '24px' }}>Loading...</h2>
-          <p style={{ margin: 0, color: '#666' }}>Fetching data from Airtable</p>
-        </div>
-      </div>
-    );
+    return <div className="p-8 text-center">Loading...</div>;
   }
 
   return (
-    <div className="app-container">
-      <div className="content-wrapper">
-        <h1 style={{
-          textAlign: 'center',
-          fontSize: '36px',
-          margin: '0 0 40px 0',
-          color: '#333',
-          fontWeight: 'bold'
-        }}>
-          TPW Regional Delivery Action Plan
-        </h1>
-
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">TPW Regional Delivery Action Plan</h1>
+        
         {/* Tab Navigation */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginBottom: '40px'
-        }}>
-          <div style={{
-            display: 'flex',
-            background: '#e9ecef',
-            borderRadius: '10px',
-            padding: '5px'
-          }}>
-            <button
-              onClick={() => setActiveTab('gantt')}
-              style={{
-                padding: '12px 24px',
-                border: 'none',
-                borderRadius: '8px',
-                background: activeTab === 'gantt' ? 'white' : 'transparent',
-                color: activeTab === 'gantt' ? '#007bff' : '#666',
-                fontWeight: activeTab === 'gantt' ? 'bold' : 'normal',
-                fontSize: '16px',
-                cursor: 'pointer',
-                boxShadow: activeTab === 'gantt' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-              }}
-            >
-              Milestones ({processedChartData.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('actions')}
-              style={{
-                padding: '12px 24px',
-                border: 'none',
-                borderRadius: '8px',
-                background: activeTab === 'actions' ? 'white' : 'transparent',
-                color: activeTab === 'actions' ? '#007bff' : '#666',
-                fontWeight: activeTab === 'actions' ? 'bold' : 'normal',
-                fontSize: '16px',
-                cursor: 'pointer',
-                boxShadow: activeTab === 'actions' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-              }}
-            >
-              Actions ({processedActions.length})
-            </button>
-          </div>
+        <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('gantt')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              activeTab === 'gantt'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Gantt Chart
+          </button>
+          <button
+            onClick={() => setActiveTab('actions')}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${
+              activeTab === 'actions'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Actions
+          </button>
         </div>
 
-        {/* Content Area */}
         {activeTab === 'gantt' && (
-          <div>
-            <h2 style={{
-              fontSize: '28px',
-              textAlign: 'center',
-              margin: '0 0 30px 0',
-              color: '#333',
-              borderBottom: '3px solid #007bff',
-              paddingBottom: '10px'
-            }}>
-              Milestones
-            </h2>
+          <div className="space-y-6">
+            {/* Gantt Chart Filters */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">Filters</h2>
+              
+              {/* Priority Filter */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Filter by Priority Area</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedPriorities([...new Set(processedChartData.map(d => d.priority))])}
+                    className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full hover:bg-green-200"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setSelectedPriorities([])}
+                    className="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded-full hover:bg-gray-200"
+                  >
+                    Clear All
+                  </button>
+                  {[...new Set(processedChartData.map(d => d.priority))].map(priority => (
+                    <button
+                      key={priority}
+                      onClick={() => togglePriority(priority)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        selectedPriorities.includes(priority)
+                          ? 'border-green-500 bg-green-50 text-green-800'
+                          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                      style={{
+                        borderColor: selectedPriorities.includes(priority) ? getPriorityColor(priority) : undefined,
+                        backgroundColor: selectedPriorities.includes(priority) ? `${getPriorityColor(priority)}20` : undefined
+                      }}
+                    >
+                      {priority}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            {processedChartData.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '60px',
-                background: 'white',
-                borderRadius: '10px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                <h3 style={{ color: '#333', margin: '0 0 10px 0' }}>No milestones found</h3>
-                <p style={{ color: '#666', margin: 0 }}>Check your Airtable configuration</p>
+              {/* Status Filter */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Filter by Status</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedStatuses([...new Set(processedChartData.map(d => d.status))])}
+                    className="px-3 py-1 text-xs bg-purple-100 text-purple-800 rounded-full hover:bg-purple-200"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setSelectedStatuses([])}
+                    className="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded-full hover:bg-gray-200"
+                  >
+                    Clear All
+                  </button>
+                  {[...new Set(processedChartData.map(d => d.status))].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => toggleStatus(status)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        selectedStatuses.includes(status)
+                          ? 'border-purple-500 bg-purple-50 text-purple-800'
+                          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
+
+              {/* Accountable Filter */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Filter by Accountable</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedAccountable([...new Set(processedChartData.map(d => d.accountable))])}
+                    className="px-3 py-1 text-xs bg-cyan-100 text-cyan-800 rounded-full hover:bg-cyan-200"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setSelectedAccountable([])}
+                    className="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded-full hover:bg-gray-200"
+                  >
+                    Clear All
+                  </button>
+                  {[...new Set(processedChartData.map(d => d.accountable))].map(person => (
+                    <button
+                      key={person}
+                      onClick={() => toggleAccountable(person)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        selectedAccountable.includes(person)
+                          ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
+                          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {person}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* View Options */}
               <div>
-                {processedChartData.map(item => (
-                  <div key={item.id} style={{
-                    background: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '10px',
-                    padding: '20px',
-                    marginBottom: '20px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }}>
-                    <h3 style={{
-                      fontSize: '18px',
-                      margin: '0 0 15px 0',
-                      color: '#333',
-                      fontWeight: 'bold'
-                    }}>
-                      {item.name}
-                    </h3>
-                    
-                    <table style={{ width: '100%', fontSize: '14px' }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Priority:</td>
-                          <td style={{ padding: '5px', color: '#333' }}>{item.priority}</td>
-                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Status:</td>
-                          <td style={{ padding: '5px' }}>
-                            <span style={{
-                              padding: '4px 8px',
-                              borderRadius: '12px',
-                              fontSize: '12px',
-                              fontWeight: 'bold',
-                              background: item.status.toLowerCase().includes('complete') ? '#d4edda' : 
-                                         item.status.toLowerCase().includes('progress') ? '#cce5ff' : '#f8f9fa',
-                              color: item.status.toLowerCase().includes('complete') ? '#155724' : 
-                                    item.status.toLowerCase().includes('progress') ? '#0056b3' : '#6c757d'
-                            }}>
-                              {item.status}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666' }}>Accountable:</td>
-                          <td style={{ padding: '5px', color: '#333' }}>{item.accountable}</td>
-                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666' }}>Deadline:</td>
-                          <td style={{ padding: '5px', color: '#333' }}>
-                            {item.deadline ? new Date(item.deadline).toLocaleDateString() : 'Not set'}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
+                <h3 className="text-sm font-medium text-gray-700 mb-2">View Options</h3>
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={groupByPriority}
+                      onChange={(e) => setGroupByPriority(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-600">Group by Priority</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={sortByDeadline}
+                      onChange={(e) => setSortByDeadline(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-600">Sort by Deadline</span>
+                  </label>
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Gantt Chart */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Milestone Timeline</h2>
+                
+                {/* Timeline Header */}
+                <div className="flex border-b border-gray-200 pb-2 mb-4">
+                  <div className="w-96 px-4 py-2 font-medium text-gray-700">Milestone</div>
+                  <div className="flex-1 relative">
+                    <div className="flex">
+                      {timelineMonths.map((month, index) => (
+                        <div
+                          key={index}
+                          className="flex-1 px-1 py-2 text-center text-xs font-medium text-gray-600 border-r border-gray-100 last:border-r-0"
+                        >
+                          {month.label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Milestones */}
+                <div className="space-y-1">
+                  {groupByPriority ? (
+                    [...new Set(displayData.map(d => d.priority))].map(priority => (
+                      <div key={priority} className="mb-4">
+                        <div className="mb-2 px-4 py-2 bg-gray-50 rounded-lg">
+                          <h3 className="font-medium text-gray-900">{priority}</h3>
+                        </div>
+                        {displayData
+                          .filter(item => item.priority === priority)
+                          .map(item => (
+                            <div key={item.id} className="flex items-center border-b border-gray-100 py-2 hover:bg-gray-50">
+                              <div className="w-96 px-4">
+                                <div className="font-medium text-sm text-gray-900">{item.name}</div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Status: {item.status} | Accountable: {item.accountable}
+                                </div>
+                              </div>
+                              <div className="flex-1 relative h-8">
+                                <div
+                                  className="absolute top-1 h-6 rounded opacity-75"
+                                  style={{
+                                    backgroundColor: getPriorityColor(item.priority),
+                                    ...getBarStyle(item.startDate, item.deadline)
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    ))
+                  ) : (
+                    displayData.map(item => (
+                      <div key={item.id} className="flex items-center border-b border-gray-100 py-2 hover:bg-gray-50">
+                        <div className="w-96 px-4">
+                          <div className="font-medium text-sm text-gray-900">{item.name}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Priority: {item.priority} | Status: {item.status} | Accountable: {item.accountable}
+                          </div>
+                        </div>
+                        <div className="flex-1 relative h-8">
+                          <div
+                            className="absolute top-1 h-6 rounded opacity-75"
+                            style={{
+                              backgroundColor: getPriorityColor(item.priority),
+                              ...getBarStyle(item.startDate, item.deadline)
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">Summary</h2>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{filteredChartData.length}</div>
+                  <div className="text-sm text-gray-600">Total Milestones</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {filteredChartData.filter(item => item.status === 'Complete').length}
+                  </div>
+                  <div className="text-sm text-gray-600">Completed</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {filteredChartData.filter(item => item.status === 'In progress').length}
+                  </div>
+                  <div className="text-sm text-gray-600">In Progress</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-600">
+                    {filteredChartData.filter(item => item.status === 'Not started').length}
+                  </div>
+                  <div className="text-sm text-gray-600">Not Started</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {activeTab === 'actions' && (
-          <div>
-            <h2 style={{
-              fontSize: '28px',
-              textAlign: 'center',
-              margin: '0 0 30px 0',
-              color: '#333',
-              borderBottom: '3px solid #007bff',
-              paddingBottom: '10px'
-            }}>
-              Actions (Director View Only)
-            </h2>
-
-            {processedActions.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '60px',
-                background: 'white',
-                borderRadius: '10px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                <h3 style={{ color: '#333', margin: '0 0 10px 0' }}>No actions found</h3>
-                <p style={{ color: '#666', margin: 0 }}>No actions have Director View = true</p>
+          <div className="space-y-6">
+            {/* Actions Filters */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">Filters</h2>
+              
+              {/* Responsible Filter */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Filter by Responsible</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedResponsible([...new Set(processedActions.map(d => d.responsible))])}
+                    className="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-full hover:bg-blue-200"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setSelectedResponsible([])}
+                    className="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded-full hover:bg-gray-200"
+                  >
+                    Clear All
+                  </button>
+                  {[...new Set(processedActions.map(d => d.responsible))].map(person => (
+                    <button
+                      key={person}
+                      onClick={() => toggleResponsible(person)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        selectedResponsible.includes(person)
+                          ? 'border-blue-500 bg-blue-50 text-blue-800'
+                          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {person}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
+
+              {/* Status Filter */}
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Filter by Status</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedActionStatuses([...new Set(processedActions.map(d => d.status))])}
+                    className="px-3 py-1 text-xs bg-green-100 text-green-800 rounded-full hover:bg-green-200"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setSelectedActionStatuses([])}
+                    className="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded-full hover:bg-gray-200"
+                  >
+                    Clear All
+                  </button>
+                  {[...new Set(processedActions.map(d => d.status))].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => toggleActionStatus(status)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        selectedActionStatuses.includes(status)
+                          ? 'border-green-500 bg-green-50 text-green-800'
+                          : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* View Options */}
               <div>
-                {processedActions.map(action => (
-                  <div key={action.id} style={{
-                    background: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '10px',
-                    padding: '20px',
-                    marginBottom: '20px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }}>
-                    <h3 style={{
-                      fontSize: '18px',
-                      margin: '0 0 15px 0',
-                      color: '#333',
-                      fontWeight: 'bold'
-                    }}>
-                      {action.name}
-                    </h3>
-                    
-                    <table style={{ width: '100%', fontSize: '14px' }}>
-                      <tbody>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">View Options</h3>
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={groupByResponsible}
+                      onChange={(e) => setGroupByResponsible(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-600">Group by Responsible</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions Table */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Actions</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Showing actions where Current Status (TPW Role) = Current
+                </p>
+                
+                {groupByResponsible ? (
+                  <div className="space-y-6">
+                    {Object.entries(groupedActions).map(([groupKey, groupActions]) => (
+                      <div key={groupKey} className="border border-gray-200 rounded-lg">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                          <h3 className="font-medium text-gray-900">
+                            {groupKey}
+                            <span className="ml-2 text-sm text-gray-600">({groupActions.length})</span>
+                          </h3>
+                        </div>
+                        <div className="divide-y divide-gray-200">
+                          {groupActions.map(action => (
+                            <div key={action.id} className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <h4 className="font-medium text-gray-900 flex-1">{action.name}</h4>
+                                <span className={`px-2 py-1 text-xs rounded-full ml-4 ${getStatusBadgeColor(action.status)}`}>
+                                  {action.status}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Status: {action.status}
+                                {action.deadline && ` | Deadline: ${new Date(action.deadline).toLocaleDateString()}`}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Responsible:</td>
-                          <td style={{ padding: '5px', color: '#333' }}>{action.responsible}</td>
-                          <td style={{ padding: '5px', fontWeight: 'bold', color: '#666', width: '120px' }}>Status:</td>
-                          <td style={{ padding: '5px' }}>
-                            <span style={{
-                              padding: '4px 8px',
-                              borderRadius: '12px',
-                              fontSize: '12px',
-                              fontWeight: 'bold',
-                              background: action.status.toLowerCase().includes('complete') ? '#d4edda' : 
-                                         action.status.toLowerCase().includes('progress') ? '#cce5ff' : '#f8f9fa',
-                              color: action.status.toLowerCase().includes('complete') ? '#155724' : 
-                                    action.status.toLowerCase().includes('progress') ? '#0056b3' : '#6c757d'
-                            }}>
-                              {action.status}
-                            </span>
-                          </td>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Action
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Responsible
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Deadline
+                          </th>
                         </tr>
-                        {action.deadline && (
-                          <tr>
-                            <td style={{ padding: '5px', fontWeight: 'bold', color: '#666' }}>Deadline:</td>
-                            <td style={{ padding: '5px', color: '#333' }} colSpan={3}>
-                              {new Date(action.deadline).toLocaleDateString()}
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {sortedActions.map((action, index) => (
+                          <tr key={action.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-6 py-4">
+                              <div className="text-sm font-medium text-gray-900">{action.name}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900">{action.responsible}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 text-xs rounded-full ${getStatusBadgeColor(action.status)}`}>
+                                {action.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900">
+                                {action.deadline ? new Date(action.deadline).toLocaleDateString() : '-'}
+                              </div>
                             </td>
                           </tr>
-                        )}
+                        ))}
                       </tbody>
                     </table>
-
-                    {action.notes && (
-                      <div style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                        <button
-                          onClick={() => toggleNoteExpansion(action.id)}
-                          style={{
-                            background: '#007bff',
-                            color: 'white',
-                            border: 'none',
-                            padding: '8px 16px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                          }}
-                        >
-                          {expandedNotes.has(action.id) ? 'Hide Notes' : 'Show Notes'}
-                        </button>
-                        {expandedNotes.has(action.id) && (
-                          <div style={{
-                            marginTop: '10px',
-                            padding: '15px',
-                            background: '#f8f9fa',
-                            borderRadius: '6px',
-                            borderLeft: '4px solid #007bff',
-                            color: '#555'
-                          }}>
-                            {action.notes}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Actions Summary */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-lg font-semibold mb-4">Summary</h2>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{filteredActions.length}</div>
+                <div className="text-sm text-gray-600">Total Actions (Current)</div>
+              </div>
+            </div>
           </div>
         )}
       </div>
