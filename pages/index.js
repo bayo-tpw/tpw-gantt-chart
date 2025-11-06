@@ -26,6 +26,7 @@ export default function Home() {
   const [groupByStatus, setGroupByStatus] = useState(false);
   const [selectedResponsible, setSelectedResponsible] = useState(new Set());
   const [selectedActionStatuses, setSelectedActionStatuses] = useState(new Set());
+  const [expandedNotes, setExpandedNotes] = useState(new Set());
 
   // Fetch data on mount
   useEffect(() => {
@@ -1225,7 +1226,7 @@ export default function Home() {
                 {/* Table Header */}
                 <div style={{ 
                   display: 'grid',
-                  gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                  gridTemplateColumns: '2fr 1fr 1fr 1fr 0.5fr',
                   borderBottom: '2px solid #e2e8f0',
                   backgroundColor: '#f8fafc',
                   fontWeight: '600',
@@ -1241,8 +1242,11 @@ export default function Home() {
                   <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0' }}>
                     Deadline
                   </div>
-                  <div style={{ padding: '12px 16px' }}>
+                  <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0' }}>
                     Status
+                  </div>
+                  <div style={{ padding: '12px 16px' }}>
+                    Notes
                   </div>
                 </div>
 
@@ -1252,7 +1256,7 @@ export default function Home() {
                     {(groupByResponsible || groupByStatus) && (
                       <div style={{
                         display: 'grid',
-                        gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                        gridTemplateColumns: '2fr 1fr 1fr 1fr 0.5fr',
                         backgroundColor: '#f1f5f9',
                         borderBottom: '2px solid #cbd5e1',
                         fontWeight: '600',
@@ -1266,62 +1270,140 @@ export default function Home() {
                       </div>
                     )}
                     
-                    {group.items.map((action, idx) => (
-                      <div 
-                        key={action.id}
-                        style={{ 
-                          display: 'grid',
-                          gridTemplateColumns: '2fr 1fr 1fr 1fr',
-                          borderBottom: '1px solid #e2e8f0',
-                          backgroundColor: idx % 2 === 0 ? 'white' : '#fafbfc'
-                        }}
-                      >
-                        <div style={{ 
-                          padding: '12px 16px',
-                          borderRight: '1px solid #e2e8f0',
-                          fontSize: '14px',
-                          color: '#334155'
-                        }}>
-                          {action.name}
-                        </div>
-                        <div style={{ 
-                          padding: '12px 16px',
-                          borderRight: '1px solid #e2e8f0',
-                          fontSize: '14px',
-                          color: groupByResponsible ? '#64748b' : '#334155'
-                        }}>
-                          {groupByResponsible ? '' : action.responsible}
-                        </div>
-                        <div style={{ 
-                          padding: '12px 16px',
-                          borderRight: '1px solid #e2e8f0',
-                          fontSize: '14px',
-                          color: '#334155'
-                        }}>
-                          {formatDate(action.deadline)}
-                        </div>
-                        <div style={{ 
-                          padding: '12px 16px',
-                          fontSize: '14px'
-                        }}>
-                          {groupByStatus ? (
-                            <span style={{ color: '#64748b' }}></span>
-                          ) : (
-                            <span style={{
-                              padding: '4px 10px',
-                              borderRadius: '4px',
-                              fontSize: '13px',
-                              fontWeight: '500',
-                              backgroundColor: `${statusColors[action.status] || '#94a3b8'}20`,
-                              color: statusColors[action.status] || '#334155',
-                              display: 'inline-block'
+                    {group.items.map((action, idx) => {
+                      const isExpanded = expandedNotes.has(action.id);
+                      const hasNotes = action.notes && action.notes.trim().length > 0;
+                      
+                      return (
+                        <div 
+                          key={action.id}
+                          style={{ 
+                            backgroundColor: idx % 2 === 0 ? 'white' : '#fafbfc'
+                          }}
+                        >
+                          {/* Main row */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '2fr 1fr 1fr 1fr 0.5fr',
+                            borderBottom: isExpanded ? 'none' : '1px solid #e2e8f0'
+                          }}>
+                            <div style={{ 
+                              padding: '12px 16px',
+                              borderRight: '1px solid #e2e8f0',
+                              fontSize: '14px',
+                              color: '#334155'
                             }}>
-                              {action.status}
-                            </span>
+                              {action.name}
+                            </div>
+                            <div style={{ 
+                              padding: '12px 16px',
+                              borderRight: '1px solid #e2e8f0',
+                              fontSize: '14px',
+                              color: groupByResponsible ? '#64748b' : '#334155'
+                            }}>
+                              {groupByResponsible ? '' : action.responsible}
+                            </div>
+                            <div style={{ 
+                              padding: '12px 16px',
+                              borderRight: '1px solid #e2e8f0',
+                              fontSize: '14px',
+                              color: '#334155'
+                            }}>
+                              {formatDate(action.deadline)}
+                            </div>
+                            <div style={{ 
+                              padding: '12px 16px',
+                              borderRight: '1px solid #e2e8f0',
+                              fontSize: '14px'
+                            }}>
+                              {groupByStatus ? (
+                                <span style={{ color: '#64748b' }}></span>
+                              ) : (
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '4px',
+                                  fontSize: '13px',
+                                  fontWeight: '500',
+                                  backgroundColor: `${statusColors[action.status] || '#94a3b8'}20`,
+                                  color: statusColors[action.status] || '#334155',
+                                  display: 'inline-block'
+                                }}>
+                                  {action.status}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ 
+                              padding: '12px 16px',
+                              fontSize: '14px',
+                              textAlign: 'center'
+                            }}>
+                              {hasNotes ? (
+                                <button
+                                  onClick={() => {
+                                    const newExpanded = new Set(expandedNotes);
+                                    if (isExpanded) {
+                                      newExpanded.delete(action.id);
+                                    } else {
+                                      newExpanded.add(action.id);
+                                    }
+                                    setExpandedNotes(newExpanded);
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#3b82f6',
+                                    cursor: 'pointer',
+                                    fontSize: '16px',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.target.style.backgroundColor = '#f0f9ff';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.backgroundColor = 'transparent';
+                                  }}
+                                  title={isExpanded ? 'Collapse notes' : 'Expand notes'}
+                                >
+                                  {isExpanded ? '▼' : '▶'}
+                                </button>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontSize: '12px' }}>—</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Expanded notes row */}
+                          {isExpanded && hasNotes && (
+                            <div style={{
+                              gridColumn: '1 / -1',
+                              padding: '12px 16px',
+                              backgroundColor: '#f8fafc',
+                              borderBottom: '1px solid #e2e8f0',
+                              borderLeft: '3px solid #3b82f6'
+                            }}>
+                              <div style={{
+                                fontSize: '12px',
+                                color: '#64748b',
+                                fontWeight: '500',
+                                marginBottom: '6px'
+                              }}>
+                                Notes:
+                              </div>
+                              <div style={{
+                                fontSize: '14px',
+                                color: '#374151',
+                                lineHeight: '1.5',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {action.notes}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
               </div>
