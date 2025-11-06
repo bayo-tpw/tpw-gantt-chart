@@ -36,37 +36,21 @@ export default async function handler(req, res) {
 
     // Use hard-coded field mappings (based on your Config table)
     console.log('API: Using hard-coded field mappings');
-    const config = {
-      'milestone_name_field': 'Name',
-      'milestone_deadline_field': 'Deadline',
-      'milestone_priority_id_field': 'Priority area',
-      'milestone_priority_name_field': 'Priority',
-      'milestone_activities_field': 'Activities',
-      'milestone_start_field': 'Start date',
-      'milestone_accountable_field': 'Accountable',
-      'milestone_status_field': 'Status',
-      'action_name_field': 'Name',
-      'action_responsible_field': 'Responsible',
-      'action_deadline_field': 'Deadline',
-      'action_status_field': 'Status',
-      'action_tpw_role_field': 'Current Status (TPW Role)',
-      'action_director_view_field': 'Director View'
-    };
-
-    // Define field mappings with fallbacks
-    const MILESTONE_NAME_FIELD = config['milestone_name_field'] || 'Name';
-    const MILESTONE_DEADLINE_FIELD = config['milestone_deadline_field'] || 'Deadline';
-    const MILESTONE_PRIORITY_NAME_FIELD = config['milestone_priority_name_field'] || 'Priority';
-    const MILESTONE_STATUS_FIELD = config['milestone_status_field'] || 'Status';
-    const MILESTONE_ACCOUNTABLE_FIELD = config['milestone_accountable_field'] || 'Accountable';
-    const MILESTONE_START_FIELD = config['milestone_start_field'] || 'Start date';
     
-    const ACTION_NAME_FIELD = config['action_name_field'] || 'Name';
-    const ACTION_RESPONSIBLE_FIELD = config['action_responsible_field'] || 'Responsible';
-    const ACTION_DEADLINE_FIELD = config['action_deadline_field'] || 'Deadline';
-    const ACTION_STATUS_FIELD = config['action_status_field'] || 'Status';
-    const ACTION_TPW_ROLE_FIELD = config['action_tpw_role_field'] || 'Current Status (TPW Role)';
-    const ACTION_DIRECTOR_VIEW_FIELD = config['action_director_view_field'] || 'Director View';
+    // Define field mappings directly (no config object needed)
+    const MILESTONE_NAME_FIELD = 'Name';
+    const MILESTONE_DEADLINE_FIELD = 'Deadline';
+    const MILESTONE_PRIORITY_NAME_FIELD = 'Priority';
+    const MILESTONE_STATUS_FIELD = 'Status';
+    const MILESTONE_ACCOUNTABLE_FIELD = 'Accountable';
+    const MILESTONE_START_FIELD = 'Start date';
+    
+    const ACTION_NAME_FIELD = 'Name';
+    const ACTION_RESPONSIBLE_FIELD = 'Responsible';
+    const ACTION_DEADLINE_FIELD = 'Deadline';
+    const ACTION_STATUS_FIELD = 'Status';
+    const ACTION_TPW_ROLE_FIELD = 'Current Status (TPW Role)';
+    const ACTION_DIRECTOR_VIEW_FIELD = 'Director View';
 
     // Fetch Milestones with pagination
     console.log('API: Fetching Milestones...');
