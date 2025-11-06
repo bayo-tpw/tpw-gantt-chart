@@ -23,6 +23,7 @@ export default function Home() {
   
   // Actions filters and options
   const [groupByResponsible, setGroupByResponsible] = useState(true);
+  const [groupByStatus, setGroupByStatus] = useState(false);
   const [selectedResponsible, setSelectedResponsible] = useState(new Set());
   const [selectedActionStatuses, setSelectedActionStatuses] = useState(new Set());
 
@@ -168,14 +169,28 @@ export default function Home() {
       deadline,
       hasStartDate: !!startDateField
     };
-  })
-  .filter(item => item.deadline)
-  .filter(item => selectedPriorities.has(item.priority))
-  .filter(item => selectedStatuses.has(item.status))
-  .filter(item => selectedAccountable.has(item.accountable));
+  });
+  
+  // Debug logging
+  console.log('Total milestones:', chartData.length);
+  console.log('Sample milestone:', chartData[0]);
+  console.log('All priorities:', [...new Set(chartData.map(m => m.priority))]);
+  console.log('All accountable:', [...new Set(chartData.map(m => m.accountable))]);
+  console.log('All statuses:', [...new Set(chartData.map(m => m.status))]);
+  console.log('Selected priorities:', Array.from(selectedPriorities));
+  console.log('Selected accountable:', Array.from(selectedAccountable));
+  console.log('Selected statuses:', Array.from(selectedStatuses));
+  
+  const filteredChartData = chartData
+    .filter(item => item.deadline)
+    .filter(item => selectedPriorities.has(item.priority))
+    .filter(item => selectedStatuses.has(item.status))
+    .filter(item => selectedAccountable.has(item.accountable));
+  
+  console.log('After filters:', filteredChartData.length);
 
   // Sort by deadline if enabled
-  let sortedData = [...chartData];
+  let sortedData = [...filteredChartData];
   if (sortByDeadline) {
     sortedData.sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
   }
@@ -313,14 +328,24 @@ export default function Home() {
       status: action.fields[ACTION_STATUS_FIELD] || 'No Status',
       tpwRole: tpwRole
     };
-  })
-  .filter(action => action.name !== 'Unnamed Action')
-  .filter(action => action.tpwRole === 'Current') // Only show actions where TPW Role is 'Current'
-  .filter(action => selectedResponsible.has(action.responsible))
-  .filter(action => selectedActionStatuses.has(action.status));
+  });
+
+  // Debug logging
+  console.log('Total actions:', processedActions.length);
+  console.log('Actions with TPW Role "Current":', processedActions.filter(a => a.tpwRole === 'Current').length);
+  console.log('Sample action:', processedActions[0]);
+  console.log('Adebayo actions:', processedActions.filter(a => a.responsible.includes('Adebayo') || a.responsible.includes('Obasaju')));
+  console.log('People Map:', peopleMap);
+  console.log('Selected Responsible:', Array.from(selectedResponsible));
+  
+  const filteredActions = processedActions
+    .filter(action => action.name !== 'Unnamed Action')
+    .filter(action => action.tpwRole === 'Current') // Only show actions where TPW Role is 'Current'
+    .filter(action => selectedResponsible.has(action.responsible))
+    .filter(action => selectedActionStatuses.has(action.status));
 
   // Sort actions by deadline
-  let sortedActions = [...processedActions].sort((a, b) => {
+  let sortedActions = [...filteredActions].sort((a, b) => {
     if (!a.deadline) return 1;
     if (!b.deadline) return -1;
     return new Date(a.deadline) - new Date(b.deadline);
@@ -343,16 +368,38 @@ export default function Home() {
     .filter(Boolean)
   )].sort();
 
-  // Group actions by responsible if enabled
-  const organizedActions = groupByResponsible
-    ? allResponsiblePeople
-        .filter(person => selectedResponsible.has(person))
-        .map(responsible => ({
-          responsible,
-          items: sortedActions.filter(a => a.responsible === responsible)
-        }))
-        .filter(group => group.items.length > 0)
-    : [{ responsible: null, items: sortedActions }];
+  // Status color mapping
+  const statusColors = {
+    'Not started': '#94a3b8', // gray
+    'In progress': '#3b82f6', // blue  
+    'Complete': '#10b981', // green
+    'On hold': '#f59e0b', // orange
+    'Cancelled': '#ef4444' // red
+  };
+
+  // Group actions by responsible or status
+  let organizedActions;
+  if (groupByStatus) {
+    organizedActions = allActionStatuses
+      .filter(status => selectedActionStatuses.has(status))
+      .map(status => ({
+        groupName: status,
+        groupType: 'status',
+        items: sortedActions.filter(a => a.status === status)
+      }))
+      .filter(group => group.items.length > 0);
+  } else if (groupByResponsible) {
+    organizedActions = allResponsiblePeople
+      .filter(person => selectedResponsible.has(person))
+      .map(responsible => ({
+        groupName: responsible,
+        groupType: 'responsible',
+        items: sortedActions.filter(a => a.responsible === responsible)
+      }))
+      .filter(group => group.items.length > 0);
+  } else {
+    organizedActions = [{ groupName: null, groupType: null, items: sortedActions }];
+  }
 
   // Responsible toggle functions
   const toggleResponsible = (person) => {
@@ -941,11 +988,11 @@ export default function Home() {
                     Total Milestones {(selectedPriorities.size < priorities.length || selectedStatuses.size < milestoneStatuses.length || selectedAccountable.size < accountablePeople.length) ? '(Filtered)' : ''}
                   </div>
                   <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
-                    {chartData.length}
+                    {filteredChartData.length}
                   </div>
                 </div>
                 {priorities.filter(p => selectedPriorities.has(p)).map(priority => {
-                  const count = chartData.filter(item => item.priority === priority).length;
+                  const count = filteredChartData.filter(item => item.priority === priority).length;
                   return (
                     <div key={priority} style={{ 
                       padding: '20px',
@@ -1188,10 +1235,26 @@ export default function Home() {
                   <input 
                     type="checkbox" 
                     checked={groupByResponsible}
-                    onChange={(e) => setGroupByResponsible(e.target.checked)}
+                    onChange={(e) => {
+                      setGroupByResponsible(e.target.checked);
+                      if (e.target.checked) setGroupByStatus(false);
+                    }}
                     style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: '14px', color: '#475569' }}>Group by Responsible</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={groupByStatus}
+                    onChange={(e) => {
+                      setGroupByStatus(e.target.checked);
+                      if (e.target.checked) setGroupByResponsible(false);
+                    }}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#475569' }}>Group by Status</span>
                 </label>
                 
                 <div style={{ 
@@ -1241,7 +1304,7 @@ export default function Home() {
                 {/* Table Rows */}
                 {organizedActions.map((group, groupIdx) => (
                   <div key={groupIdx}>
-                    {groupByResponsible && (
+                    {(groupByResponsible || groupByStatus) && (
                       <div style={{
                         display: 'grid',
                         gridTemplateColumns: '2fr 1fr 1fr 1fr',
@@ -1253,7 +1316,7 @@ export default function Home() {
                         padding: '12px 16px'
                       }}>
                         <div style={{ gridColumn: '1 / -1' }}>
-                          {group.responsible} ({group.items.length} action{group.items.length !== 1 ? 's' : ''})
+                          {group.groupName} ({group.items.length} action{group.items.length !== 1 ? 's' : ''})
                         </div>
                       </div>
                     )}
@@ -1294,10 +1357,23 @@ export default function Home() {
                         </div>
                         <div style={{ 
                           padding: '12px 16px',
-                          fontSize: '14px',
-                          color: '#334155'
+                          fontSize: '14px'
                         }}>
-                          {action.status}
+                          {groupByStatus ? (
+                            <span style={{ color: '#64748b' }}></span>
+                          ) : (
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              backgroundColor: `${statusColors[action.status] || '#94a3b8'}20`,
+                              color: statusColors[action.status] || '#334155',
+                              display: 'inline-block'
+                            }}>
+                              {action.status}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1317,7 +1393,7 @@ export default function Home() {
                   Total Actions {(selectedResponsible.size < allResponsiblePeople.length || selectedActionStatuses.size < allActionStatuses.length) ? '(Filtered)' : ''}
                 </div>
                 <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>
-                  {processedActions.length}
+                  {filteredActions.length}
                 </div>
               </div>
             </>
