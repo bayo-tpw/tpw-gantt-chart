@@ -53,18 +53,25 @@ export default async function handler(req, res) {
       }
     }
 
-    // Fetch Config table for dynamic field mapping
-    console.log('API: Fetching Config...');
-    let config = {};
-    try {
-      const configData = await fetchAllRecords(base('Config').select());
-      config = Object.fromEntries(
-        configData.map(record => [record.fields.Key, record.fields.Value])
-      );
-      console.log('API: Config loaded:', Object.keys(config));
-    } catch (configError) {
-      console.log('API: Config table not found, using defaults');
-    }
+    // Use hard-coded field mappings (based on your Config table)
+    console.log('API: Using hard-coded field mappings');
+    const config = {
+      'milestone_name_field': 'Name',
+      'milestone_deadline_field': 'Deadline',
+      'milestone_priority_id_field': 'Priority area',
+      'milestone_priority_name_field': 'Priority',
+      'milestone_activities_field': 'Activities',
+      'milestone_start_field': 'Start date',
+      'milestone_accountable_field': 'Accountable',
+      'milestone_status_field': 'Status',
+      'action_name_field': 'Name',
+      'action_responsible_field': 'Responsible',
+      'action_deadline_field': 'Deadline',
+      'action_status_field': 'Status',
+      'action_tpw_role_field': 'Current Status (TPW Role)',
+      'action_director_view_field': 'Director View'
+    };
+    console.log('API: Field mappings loaded');
 
     // Define field mappings with fallbacks
     const MILESTONE_NAME_FIELD = config['milestone_name_field'] || 'Name';
