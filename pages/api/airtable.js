@@ -3,24 +3,54 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const Airtable = require('airtable');
-  const base = Airtable.base(process.env.AIRTABLE_BASE_ID);
-
   try {
-    console.log('API: Starting data fetch...');
+    console.log('API: Starting - checking environment variables...');
+    
+    // Check environment variables (don't log actual values for security)
+    const baseIdExists = !!process.env.AIRTABLE_BASE_ID;
+    const apiKeyExists = !!process.env.AIRTABLE_API_KEY;
+    const baseIdLength = process.env.AIRTABLE_BASE_ID ? process.env.AIRTABLE_BASE_ID.length : 0;
+    const apiKeyLength = process.env.AIRTABLE_API_KEY ? process.env.AIRTABLE_API_KEY.length : 0;
+    
+    console.log('API: Base ID exists:', baseIdExists, 'length:', baseIdLength);
+    console.log('API: API Key exists:', apiKeyExists, 'length:', apiKeyLength);
+    
+    if (!process.env.AIRTABLE_BASE_ID) {
+      console.error('API: AIRTABLE_BASE_ID not set');
+      return res.status(500).json({ error: 'AIRTABLE_BASE_ID environment variable not set' });
+    }
+    
+    if (!process.env.AIRTABLE_API_KEY) {
+      console.error('API: AIRTABLE_API_KEY not set');
+      return res.status(500).json({ error: 'AIRTABLE_API_KEY environment variable not set' });
+    }
+
+    console.log('API: Environment variables OK');
+    
+    const Airtable = require('airtable');
+    Airtable.configure({
+      endpointUrl: 'https://api.airtable.com',
+      apiKey: process.env.AIRTABLE_API_KEY
+    });
+    const base = Airtable.base(process.env.AIRTABLE_BASE_ID);
+
+    console.log('API: Airtable configured');
 
     // Helper function to fetch all records with pagination
     async function fetchAllRecords(query) {
-      let allRecords = [];
-      let records = await query.firstPage();
-      allRecords = [...records];
-      
-      while (query.offset) {
-        records = await query.eachPage();
-        allRecords = [...allRecords, ...records];
+      try {
+        let allRecords = [];
+        
+        await query.eachPage((records, fetchNextPage) => {
+          allRecords = allRecords.concat(records);
+          fetchNextPage();
+        });
+        
+        return allRecords;
+      } catch (error) {
+        console.error('API: Error in fetchAllRecords:', error);
+        throw error;
       }
-      
-      return allRecords;
     }
 
     // Fetch Config table for dynamic field mapping
@@ -177,7 +207,15 @@ export default async function handler(req, res) {
       milestones,
       actions,
       peopleMap,
-      prioritiesMap: {}
+      prioritiesMap: {},
+      // Debug information
+      debug: {
+        totalActionsBeforeFilter: actionsData.length,
+        totalActionsAfterFilter: actions.length,
+        directorViewFieldName: ACTION_DIRECTOR_VIEW_FIELD,
+        sampleActionFields: actionsData[0]?.fields ? Object.keys(actionsData[0].fields) : [],
+        configKeys: Object.keys(config)
+      }
     };
 
     res.status(200).json(response);
