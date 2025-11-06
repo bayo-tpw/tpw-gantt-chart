@@ -34,49 +34,19 @@ export default async function handler(req, res) {
       }
     }
 
-    // Use hard-coded field mappings (based on your Config table)
-    console.log('API: Using hard-coded field mappings');
-    
-    // Define field mappings directly (no config object needed)
-    const MILESTONE_NAME_FIELD = 'Name';
-    const MILESTONE_DEADLINE_FIELD = 'Deadline';
-    const MILESTONE_PRIORITY_NAME_FIELD = 'Priority';
-    const MILESTONE_STATUS_FIELD = 'Status';
-    const MILESTONE_ACCOUNTABLE_FIELD = 'Accountable';
-    const MILESTONE_START_FIELD = 'Start date';
-    
-    const ACTION_NAME_FIELD = 'Name';
-    const ACTION_RESPONSIBLE_FIELD = 'Responsible';
-    const ACTION_DEADLINE_FIELD = 'Deadline';
-    const ACTION_STATUS_FIELD = 'Status';
-    const ACTION_TPW_ROLE_FIELD = 'Current Status (TPW Role)';
-    const ACTION_DIRECTOR_VIEW_FIELD = 'Director View';
+    console.log('API: Using direct field mappings');
 
     // Fetch Milestones with pagination
     console.log('API: Fetching Milestones...');
     const milestonesData = await fetchAllRecords(base('Milestones').select({
-      fields: [
-        MILESTONE_NAME_FIELD,
-        MILESTONE_DEADLINE_FIELD,
-        MILESTONE_PRIORITY_NAME_FIELD,
-        MILESTONE_STATUS_FIELD,
-        MILESTONE_ACCOUNTABLE_FIELD,
-        MILESTONE_START_FIELD
-      ]
+      fields: ['Name', 'Deadline', 'Priority', 'Status', 'Accountable', 'Start date']
     }));
     console.log('API: Milestones fetched:', milestonesData.length);
 
     // Fetch Actions with pagination
     console.log('API: Fetching Actions...');
     const actionsData = await fetchAllRecords(base('Actions').select({
-      fields: [
-        ACTION_NAME_FIELD,
-        ACTION_RESPONSIBLE_FIELD,
-        ACTION_DEADLINE_FIELD,
-        ACTION_STATUS_FIELD,
-        ACTION_TPW_ROLE_FIELD,
-        ACTION_DIRECTOR_VIEW_FIELD
-      ]
+      fields: ['Name', 'Responsible', 'Deadline', 'Status', 'Current Status (TPW Role)', 'Director View']
     }));
     console.log('API: Actions fetched:', actionsData.length);
 
@@ -95,14 +65,14 @@ export default async function handler(req, res) {
     // Process milestones
     const milestones = milestonesData.map(record => ({
       id: record.id,
-      name: record.fields[MILESTONE_NAME_FIELD] || '',
-      deadline: record.fields[MILESTONE_DEADLINE_FIELD] || '',
-      priority: Array.isArray(record.fields[MILESTONE_PRIORITY_NAME_FIELD]) 
-        ? record.fields[MILESTONE_PRIORITY_NAME_FIELD][0] 
-        : record.fields[MILESTONE_PRIORITY_NAME_FIELD] || '',
-      status: record.fields[MILESTONE_STATUS_FIELD] || '',
-      accountable: record.fields[MILESTONE_ACCOUNTABLE_FIELD] || '',
-      startDate: record.fields[MILESTONE_START_FIELD] || ''
+      name: record.fields['Name'] || '',
+      deadline: record.fields['Deadline'] || '',
+      priority: Array.isArray(record.fields['Priority']) 
+        ? record.fields['Priority'][0] 
+        : record.fields['Priority'] || '',
+      status: record.fields['Status'] || '',
+      accountable: record.fields['Accountable'] || '',
+      startDate: record.fields['Start date'] || ''
     }));
 
     // Create people map for linked records
@@ -115,12 +85,12 @@ export default async function handler(req, res) {
     const actions = actionsData
       .filter(record => {
         // Filter by TPW Role = 'Current' AND Director View = true
-        const tpwRole = record.fields[ACTION_TPW_ROLE_FIELD];
-        const directorView = record.fields[ACTION_DIRECTOR_VIEW_FIELD];
+        const tpwRole = record.fields['Current Status (TPW Role)'];
+        const directorView = record.fields['Director View'];
         return tpwRole === 'Current' && directorView === true;
       })
       .map(record => {
-        const responsibleField = record.fields[ACTION_RESPONSIBLE_FIELD];
+        const responsibleField = record.fields['Responsible'];
         let responsible = 'Unassigned';
 
         // Handle both linked records and single select text
@@ -135,12 +105,12 @@ export default async function handler(req, res) {
 
         return {
           id: record.id,
-          name: record.fields[ACTION_NAME_FIELD] || '',
+          name: record.fields['Name'] || '',
           responsible: responsible,
-          deadline: record.fields[ACTION_DEADLINE_FIELD] || '',
-          status: record.fields[ACTION_STATUS_FIELD] || '',
-          tpwRole: record.fields[ACTION_TPW_ROLE_FIELD] || '',
-          directorView: record.fields[ACTION_DIRECTOR_VIEW_FIELD] || false
+          deadline: record.fields['Deadline'] || '',
+          status: record.fields['Status'] || '',
+          tpwRole: record.fields['Current Status (TPW Role)'] || '',
+          directorView: record.fields['Director View'] || false
         };
       });
 
@@ -154,7 +124,7 @@ export default async function handler(req, res) {
       debug: {
         totalActionsBeforeFilter: actionsData.length,
         totalActionsAfterFilter: actions.length,
-        directorViewFieldName: ACTION_DIRECTOR_VIEW_FIELD
+        directorViewFieldName: 'Director View'
       }
     };
 
