@@ -34,23 +34,96 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log('API: Using direct field mappings');
+    // Try to fetch Config table, fall back to defaults if it fails
+    console.log('API: Fetching Config table...');
+    let config = {};
+    
+    try {
+      const configData = await fetchAllRecords(base('Config').select({
+        fields: ['Key', 'Value']
+      }));
+      
+      console.log('API: Config records found:', configData.length);
+      
+      // Convert config array to object
+      configData.forEach(record => {
+        const key = record.fields.Key;
+        const value = record.fields.Value;
+        if (key && value) {
+          config[key] = value;
+        }
+      });
+      
+      console.log('API: Config keys loaded:', Object.keys(config));
+      
+    } catch (configError) {
+      console.log('API: Config table fetch failed, using defaults:', configError.message);
+      
+      // Use default config values that match your table
+      config = {
+        'milestone_name_field': 'Name',
+        'milestone_deadline_field': 'Deadline',
+        'milestone_priority_name_field': 'Priority',
+        'milestone_status_field': 'Status',
+        'milestone_accountable_field': 'Accountable',
+        'milestone_start_field': 'Start date',
+        'action_name_field': 'Name',
+        'action_responsible_field': 'Responsible',
+        'action_deadline_field': 'Deadline',
+        'action_status_field': 'Status',
+        'action_tpw_role_field': 'Current Status (TPW Role)',
+        'action_director_view_field': 'Director View'
+      };
+    }
 
-    // Fetch Milestones with pagination
+    // Get field names from config with fallbacks
+    const getField = (configKey, fallback) => config[configKey] || fallback;
+    
+    const MILESTONE_NAME_FIELD = getField('milestone_name_field', 'Name');
+    const MILESTONE_DEADLINE_FIELD = getField('milestone_deadline_field', 'Deadline');
+    const MILESTONE_PRIORITY_NAME_FIELD = getField('milestone_priority_name_field', 'Priority');
+    const MILESTONE_STATUS_FIELD = getField('milestone_status_field', 'Status');
+    const MILESTONE_ACCOUNTABLE_FIELD = getField('milestone_accountable_field', 'Accountable');
+    const MILESTONE_START_FIELD = getField('milestone_start_field', 'Start date');
+    
+    const ACTION_NAME_FIELD = getField('action_name_field', 'Name');
+    const ACTION_RESPONSIBLE_FIELD = getField('action_responsible_field', 'Responsible');
+    const ACTION_DEADLINE_FIELD = getField('action_deadline_field', 'Deadline');
+    const ACTION_STATUS_FIELD = getField('action_status_field', 'Status');
+    const ACTION_TPW_ROLE_FIELD = getField('action_tpw_role_field', 'Current Status (TPW Role)');
+    const ACTION_DIRECTOR_VIEW_FIELD = getField('action_director_view_field', 'Director View');
+
+    console.log('API: Using field mappings - Milestone name:', MILESTONE_NAME_FIELD, 'Action director view:', ACTION_DIRECTOR_VIEW_FIELD);
+
+    // Fetch Milestones
     console.log('API: Fetching Milestones...');
     const milestonesData = await fetchAllRecords(base('Milestones').select({
-      fields: ['Name', 'Deadline', 'Priority', 'Status', 'Accountable', 'Start date']
+      fields: [
+        MILESTONE_NAME_FIELD,
+        MILESTONE_DEADLINE_FIELD,
+        MILESTONE_PRIORITY_NAME_FIELD,
+        MILESTONE_STATUS_FIELD,
+        MILESTONE_ACCOUNTABLE_FIELD,
+        MILESTONE_START_FIELD
+      ]
     }));
     console.log('API: Milestones fetched:', milestonesData.length);
 
-    // Fetch Actions with pagination
+    // Fetch Actions
     console.log('API: Fetching Actions...');
     const actionsData = await fetchAllRecords(base('Actions').select({
-      fields: ['Name', 'Responsible', 'Deadline', 'Status', 'Current Status (TPW Role)', 'Director View']
+      fields: [
+        ACTION_NAME_FIELD,
+        ACTION_RESPONSIBLE_FIELD,
+        ACTION_DEADLINE_FIELD,
+        ACTION_STATUS_FIELD,
+        ACTION_TPW_ROLE_FIELD,
+        ACTION_DIRECTOR_VIEW_FIELD
+      ]
     }));
     console.log('API: Actions fetched:', actionsData.length);
 
-    // Fetch People table with pagination
+    // Fetch People
     console.log('API: Fetching People...');
     let peopleData = [];
     try {
@@ -65,66 +138,68 @@ export default async function handler(req, res) {
     // Process milestones
     const milestones = milestonesData.map(record => ({
       id: record.id,
-      name: record.fields['Name'] || '',
-      deadline: record.fields['Deadline'] || '',
-      priority: Array.isArray(record.fields['Priority']) 
-        ? record.fields['Priority'][0] 
-        : record.fields['Priority'] || '',
-      status: record.fields['Status'] || '',
-      accountable: record.fields['Accountable'] || '',
-      startDate: record.fields['Start date'] || ''
+      name: record.fields[MILESTONE_NAME_FIELD] || '',
+      deadline: record.fields[MILESTONE_DEADLINE_FIELD] || '',
+      priority: Array.isArray(record.fields[MILESTONE_PRIORITY_NAME_FIELD]) 
+        ? record.fields[MILESTONE_PRIORITY_NAME_FIELD][0] 
+        : record.fields[MILESTONE_PRIORITY_NAME_FIELD] || '',
+      status: record.fields[MILESTONE_STATUS_FIELD] || '',
+      accountable: record.fields[MILESTONE_ACCOUNTABLE_FIELD] || '',
+      startDate: record.fields[MILESTONE_START_FIELD] || ''
     }));
 
-    // Create people map for linked records
+    // Create people map
     const peopleMap = {};
     peopleData.forEach(record => {
       peopleMap[record.id] = record.fields.Name || 'Unknown';
     });
 
     // Process actions with Director View filtering
+    console.log('API: Filtering actions by Director View and TPW Role...');
     const actions = actionsData
       .filter(record => {
-        // Filter by TPW Role = 'Current' AND Director View = true
-        const tpwRole = record.fields['Current Status (TPW Role)'];
-        const directorView = record.fields['Director View'];
+        const tpwRole = record.fields[ACTION_TPW_ROLE_FIELD];
+        const directorView = record.fields[ACTION_DIRECTOR_VIEW_FIELD];
         return tpwRole === 'Current' && directorView === true;
       })
       .map(record => {
-        const responsibleField = record.fields['Responsible'];
+        const responsibleField = record.fields[ACTION_RESPONSIBLE_FIELD];
         let responsible = 'Unassigned';
 
-        // Handle both linked records and single select text
         if (Array.isArray(responsibleField) && responsibleField.length > 0) {
-          // Linked record - look up name from peopleMap
           const responsibleId = responsibleField[0];
           responsible = peopleMap[responsibleId] || 'Unknown';
         } else if (typeof responsibleField === 'string') {
-          // Single select text
           responsible = responsibleField;
         }
 
         return {
           id: record.id,
-          name: record.fields['Name'] || '',
+          name: record.fields[ACTION_NAME_FIELD] || '',
           responsible: responsible,
-          deadline: record.fields['Deadline'] || '',
-          status: record.fields['Status'] || '',
-          tpwRole: record.fields['Current Status (TPW Role)'] || '',
-          directorView: record.fields['Director View'] || false
+          deadline: record.fields[ACTION_DEADLINE_FIELD] || '',
+          status: record.fields[ACTION_STATUS_FIELD] || '',
+          tpwRole: record.fields[ACTION_TPW_ROLE_FIELD] || '',
+          directorView: record.fields[ACTION_DIRECTOR_VIEW_FIELD] || false
         };
       });
 
-    console.log('API: Processed', milestones.length, 'milestones and', actions.length, 'actions');
+    console.log('API: Actions after filtering:', actions.length, 'out of', actionsData.length);
 
     const response = {
       milestones,
       actions,
       peopleMap,
       prioritiesMap: {},
+      config: config, // Include config in response for frontend
       debug: {
         totalActionsBeforeFilter: actionsData.length,
         totalActionsAfterFilter: actions.length,
-        directorViewFieldName: 'Director View'
+        configKeys: Object.keys(config),
+        fieldMappings: {
+          milestone_name: MILESTONE_NAME_FIELD,
+          action_director_view: ACTION_DIRECTOR_VIEW_FIELD
+        }
       }
     };
 
@@ -134,7 +209,8 @@ export default async function handler(req, res) {
     console.error('API: Error fetching data:', error);
     res.status(500).json({ 
       error: 'Failed to fetch data', 
-      details: error.message
+      details: error.message,
+      stack: error.stack
     });
   }
 }
