@@ -137,6 +137,18 @@ export default async function handler(req, res) {
       console.log('API: People table error, continuing without it');
     }
 
+    // Fetch Notes table (if Notes field is linked)
+    console.log('API: Fetching Notes...');
+    let notesData = [];
+    try {
+      notesData = await fetchAllRecords(base('Notes').select({
+        fields: ['Description']
+      }));
+      console.log('API: Notes fetched:', notesData.length);
+    } catch (notesError) {
+      console.log('API: Notes table error, continuing without it:', notesError.message);
+    }
+
     // Process milestones
     const milestones = milestonesData.map(record => ({
       id: record.id,
@@ -154,6 +166,12 @@ export default async function handler(req, res) {
     const peopleMap = {};
     peopleData.forEach(record => {
       peopleMap[record.id] = record.fields.Name || 'Unknown';
+    });
+
+    // Create notes map for linked notes
+    const notesMap = {};
+    notesData.forEach(record => {
+      notesMap[record.id] = record.fields.Description || '';
     });
 
     // Process actions with Director View filtering
@@ -175,6 +193,18 @@ export default async function handler(req, res) {
           responsible = responsibleField;
         }
 
+        // Handle notes field - could be linked record or text
+        const notesField = record.fields[ACTION_NOTES_FIELD];
+        let notes = '';
+        if (Array.isArray(notesField) && notesField.length > 0) {
+          // Linked record - look up in notesMap
+          const notesId = notesField[0];
+          notes = notesMap[notesId] || '';
+        } else if (typeof notesField === 'string') {
+          // Direct text field
+          notes = notesField;
+        }
+
         return {
           id: record.id,
           name: record.fields[ACTION_NAME_FIELD] || '',
@@ -183,7 +213,7 @@ export default async function handler(req, res) {
           status: record.fields[ACTION_STATUS_FIELD] || '',
           tpwRole: record.fields[ACTION_TPW_ROLE_FIELD] || '',
           directorView: record.fields[ACTION_DIRECTOR_VIEW_FIELD] || false,
-          notes: record.fields[ACTION_NOTES_FIELD] || ''
+          notes: notes
         };
       });
 
