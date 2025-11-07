@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 
 export default function Home() {
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  
   // Data state
   const [config, setConfig] = useState({});
   const [milestones, setMilestones] = useState([]);
@@ -27,6 +32,154 @@ export default function Home() {
   const [selectedResponsible, setSelectedResponsible] = useState(new Set());
   const [selectedActionStatuses, setSelectedActionStatuses] = useState(new Set());
   const [expandedNotes, setExpandedNotes] = useState(new Set());
+
+  // Password for authentication
+  const correctPassword = 'TPW2025!'; // Change this to your desired password
+
+  const handleLogin = () => {
+    if (password === correctPassword) {
+      setIsAuthenticated(true);
+      setAuthError('');
+    } else {
+      setAuthError('Incorrect password. Please try again.');
+      setPassword('');
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleLogin();
+    }
+  };
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Head>
+          <title>TPW Regional Delivery Action Plan - Login</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+        </Head>
+        
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh',
+          fontFamily: 'system-ui',
+          backgroundColor: '#f8fafc'
+        }}>
+          <div style={{ 
+            padding: '40px', 
+            backgroundColor: 'white', 
+            borderRadius: '12px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+            maxWidth: '450px',
+            width: '90%'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+              <h1 style={{ 
+                marginBottom: '8px', 
+                color: '#1e293b',
+                fontSize: '24px',
+                fontWeight: '700'
+              }}>
+                TPW Regional Delivery Action Plan
+              </h1>
+              <p style={{ 
+                marginBottom: '0', 
+                color: '#64748b',
+                fontSize: '14px'
+              }}>
+                North-East & Cumbria Regional Delivery
+              </p>
+            </div>
+            
+            <div style={{ marginBottom: '25px' }}>
+              <label style={{
+                display: 'block',
+                marginBottom: '8px',
+                fontWeight: '600',
+                color: '#374151',
+                fontSize: '14px'
+              }}>
+                Access Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyPress={handleKeyPress}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: authError ? '2px solid #ef4444' : '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontFamily: 'system-ui',
+                  transition: 'border-color 0.2s',
+                  outline: 'none'
+                }}
+                placeholder="Enter dashboard password"
+                onFocus={(e) => {
+                  if (!authError) e.target.style.borderColor = '#3b82f6';
+                }}
+                onBlur={(e) => {
+                  if (!authError) e.target.style.borderColor = '#e2e8f0';
+                }}
+              />
+              {authError && (
+                <p style={{
+                  color: '#ef4444',
+                  fontSize: '14px',
+                  marginTop: '8px',
+                  marginBottom: '0'
+                }}>
+                  {authError}
+                </p>
+              )}
+            </div>
+            
+            <button
+              onClick={handleLogin}
+              style={{
+                width: '100%',
+                padding: '14px',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#2563eb';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#3b82f6';
+              }}
+            >
+              Access Dashboard
+            </button>
+            
+            <div style={{
+              marginTop: '25px',
+              padding: '15px',
+              backgroundColor: '#f0f9ff',
+              borderRadius: '8px',
+              fontSize: '13px',
+              color: '#0369a1'
+            }}>
+              <strong>Note:</strong> This dashboard contains confidential project information. 
+              Please ensure you have authorization to access this content.
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   // Fetch data on mount
   useEffect(() => {
