@@ -33,9 +33,77 @@ export default function Home() {
   const [selectedActionStatuses, setSelectedActionStatuses] = useState(new Set());
   const [expandedNotes, setExpandedNotes] = useState(new Set());
 
+  // Fetch data on mount
+  useEffect(() => {
+    fetch('/api/airtable')
+      .then(res => res.json())
+      .then(data => {
+        console.log('=== API RESPONSE DEBUG ===');
+        console.log('Config received:', Object.keys(data.config || {}));
+        console.log('Milestones count:', (data.milestones || []).length);
+        console.log('Actions count:', (data.actions || []).length);
+        console.log('People Map received:', data.peopleMap);
+        console.log('Sample milestone:', data.milestones?.[0]);
+        console.log('Sample action:', data.actions?.[0]);
+        
+        setConfig(data.config || {});
+        setMilestones(data.milestones || []);
+        setActions(data.actions || []);
+        setPeopleMap(data.peopleMap || {});
+        setPrioritiesMap(data.prioritiesMap || {});
+        
+        // Initialize milestone priority filter (all selected) - using processed data
+        const allPriorities = new Set(
+          (data.milestones || [])
+            .map(m => m.priority)
+            .filter(Boolean)
+        );
+        setSelectedPriorities(allPriorities);
+        
+        // Initialize milestone status filter (all selected)
+        const allMilestoneStatuses = new Set(
+          (data.milestones || [])
+            .map(m => m.status)
+            .filter(Boolean)
+        );
+        setSelectedStatuses(allMilestoneStatuses);
+        
+        // Initialize milestone accountable filter (all selected)
+        const allAccountable = new Set(
+          (data.milestones || [])
+            .map(m => m.accountable)
+            .filter(Boolean)
+        );
+        setSelectedAccountable(allAccountable);
+        
+        // Initialize action responsible filter (all selected)
+        const allResponsible = new Set(
+          (data.actions || [])
+            .map(a => a.responsible)
+            .filter(Boolean)
+        );
+        setSelectedResponsible(allResponsible);
+        
+        // Initialize action status filter (all selected)
+        const allActionStatuses = new Set(
+          (data.actions || [])
+            .map(a => a.status)
+            .filter(Boolean)
+        );
+        setSelectedActionStatuses(allActionStatuses);
+        
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
+
   // Password for authentication
   const correctPassword = 'TPW2025!'; // Change this to your desired password
 
+  // Authentication functions
   const handleLogin = () => {
     if (password === correctPassword) {
       setIsAuthenticated(true);
@@ -180,73 +248,6 @@ export default function Home() {
       </>
     );
   }
-
-  // Fetch data on mount
-  useEffect(() => {
-    fetch('/api/airtable')
-      .then(res => res.json())
-      .then(data => {
-        console.log('=== API RESPONSE DEBUG ===');
-        console.log('Config received:', Object.keys(data.config || {}));
-        console.log('Milestones count:', (data.milestones || []).length);
-        console.log('Actions count:', (data.actions || []).length);
-        console.log('People Map received:', data.peopleMap);
-        console.log('Sample milestone:', data.milestones?.[0]);
-        console.log('Sample action:', data.actions?.[0]);
-        
-        setConfig(data.config || {});
-        setMilestones(data.milestones || []);
-        setActions(data.actions || []);
-        setPeopleMap(data.peopleMap || {});
-        setPrioritiesMap(data.prioritiesMap || {});
-        
-        // Initialize milestone priority filter (all selected) - using processed data
-        const allPriorities = new Set(
-          (data.milestones || [])
-            .map(m => m.priority)
-            .filter(Boolean)
-        );
-        setSelectedPriorities(allPriorities);
-        
-        // Initialize milestone status filter (all selected)
-        const allMilestoneStatuses = new Set(
-          (data.milestones || [])
-            .map(m => m.status)
-            .filter(Boolean)
-        );
-        setSelectedStatuses(allMilestoneStatuses);
-        
-        // Initialize milestone accountable filter (all selected)
-        const allAccountable = new Set(
-          (data.milestones || [])
-            .map(m => m.accountable)
-            .filter(Boolean)
-        );
-        setSelectedAccountable(allAccountable);
-        
-        // Initialize action responsible filter (all selected)
-        const allResponsible = new Set(
-          (data.actions || [])
-            .map(a => a.responsible)
-            .filter(Boolean)
-        );
-        setSelectedResponsible(allResponsible);
-        
-        // Initialize action status filter (all selected)
-        const allActionStatuses = new Set(
-          (data.actions || [])
-            .map(a => a.status)
-            .filter(Boolean)
-        );
-        setSelectedActionStatuses(allActionStatuses);
-        
-        setLoading(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
 
   if (loading) {
     return (
