@@ -241,7 +241,7 @@ export default function Home() {
               color: '#0369a1'
             }}>
               <strong>Note:</strong> This dashboard contains confidential project information. 
-              Please ensure you have authorization to access this content.
+              Please ensure you have authorisation to access this content.
             </div>
           </div>
         </div>
