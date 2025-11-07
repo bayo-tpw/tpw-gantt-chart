@@ -173,6 +173,8 @@ export default async function handler(req, res) {
     notesData.forEach(record => {
       notesMap[record.id] = record.fields.Description || '';
     });
+    console.log('API: Notes map created with', Object.keys(notesMap).length, 'entries');
+    console.log('API: Sample notes map entries:', Object.entries(notesMap).slice(0, 3));
 
     // Process actions with Director View filtering
     console.log('API: Filtering actions by Director View and TPW Role...');
@@ -196,14 +198,25 @@ export default async function handler(req, res) {
         // Handle notes field - could be linked record or text
         const notesField = record.fields[ACTION_NOTES_FIELD];
         let notes = '';
+        
+        console.log('API: Processing notes for action:', record.fields[ACTION_NAME_FIELD]);
+        console.log('API: Raw notes field:', notesField);
+        console.log('API: Notes field type:', typeof notesField);
+        console.log('API: Is notes field array?:', Array.isArray(notesField));
+        
         if (Array.isArray(notesField) && notesField.length > 0) {
           // Linked record - look up in notesMap
           const notesId = notesField[0];
           notes = notesMap[notesId] || '';
+          console.log('API: Linked notes ID:', notesId);
+          console.log('API: Notes from map:', notes);
         } else if (typeof notesField === 'string') {
           // Direct text field
           notes = notesField;
+          console.log('API: Direct text notes:', notes);
         }
+        
+        console.log('API: Final notes value:', notes);
 
         return {
           id: record.id,
