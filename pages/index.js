@@ -287,12 +287,14 @@ export default function Home() {
     responsible: action.responsible || 'Unassigned',
     deadline: action.deadline || '',
     status: action.status || 'No Status',
-    tpwRole: action.tpwRole || ''
+    tpwRole: action.tpwRole || '',
+    notes: action.notes || ''
   }));
 
   console.log('=== ACTIONS DEBUG ===');
   console.log('Total actions:', processedActions.length);
   console.log('Sample action:', processedActions[0]);
+  console.log('Actions with notes:', processedActions.filter(a => a.notes && a.notes.length > 0));
   console.log('All responsible people:', [...new Set(processedActions.map(a => a.responsible))]);
   console.log('Selected Responsible:', Array.from(selectedResponsible));
   
