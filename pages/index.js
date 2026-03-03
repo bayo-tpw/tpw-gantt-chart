@@ -1,70 +1,118 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Head from 'next/head';
 
 // ============================================================
-// FINANCE DATA — from approved tpwnec_dashboard.jsx artifact
+// FINANCE — Live data from Google Sheets (published CSV)
+// Sheet: "TPWNEC Finance Dashboard" — separate tabs
+// Spreadsheet ID: 1qz5QLedp8uQcQB29jzaYT3LPwMxd_vOyq-F6L6fSDg0
+// Tabs: Transactions, Budget, Pipeline, Settings
 // ============================================================
-const TRANSACTIONS = [
-  { date: "2025-11-07", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Nov-25" },
-  { date: "2025-11-18", detail: "The Angelou Centre", cat: "The National Lottery", amount: 273.55, type: "Income", month: "Nov-25" },
-  { date: "2025-11-20", detail: "Bayo Obasaju EXP-32", cat: "Programme Delivery and Activities", amount: -248, type: "Expense", month: "Nov-25" },
-  { date: "2025-11-20", detail: "Bayo Obasaju EXP-33", cat: "Programme Delivery and Activities", amount: -59.6, type: "Expense", month: "Nov-25" },
-  { date: "2025-11-20", detail: "Bayo Obasaju EXP-34", cat: "Programme Delivery and Activities", amount: -65.65, type: "Expense", month: "Nov-25" },
-  { date: "2025-11-30", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -6.9, type: "Expense", month: "Nov-25" },
-  { date: "2025-12-05", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Dec-25" },
-  { date: "2025-12-05", detail: "ARC Inv001", cat: "The National Lottery", amount: 5657.53, type: "Income", month: "Dec-25" },
-  { date: "2025-12-08", detail: "Create Foundation TPW01", cat: "Programme Manager", amount: -5657.53, type: "Expense", month: "Dec-25" },
-  { date: "2025-12-17", detail: "ARC Inv003", cat: "The National Lottery", amount: 15080.8, type: "Income", month: "Dec-25" },
-  { date: "2025-12-17", detail: "1 Strawberry Lane", cat: "Programme Delivery and Activities", amount: -102, type: "Expense", month: "Dec-25" },
-  { date: "2025-12-19", detail: "Create Foundation Q1", cat: "Programme Manager", amount: -10000, type: "Expense", month: "Dec-25" },
-  { date: "2025-12-23", detail: "ARC Inv002", cat: "The National Lottery", amount: 15080.08, type: "Income", month: "Dec-25" },
-  { date: "2025-12-23", detail: "Create Foundation Q1", cat: "Programme Manager", amount: -6721.37, type: "Expense", month: "Dec-25" },
-  { date: "2025-12-30", detail: "ARC Inv004", cat: "The National Lottery", amount: 5000, type: "Income", month: "Dec-25" },
-  { date: "2025-12-30", detail: "Create Foundation Q2 Dec", cat: "Programme Manager", amount: -8649.54, type: "Expense", month: "Dec-25" },
-  { date: "2025-12-31", detail: "Credit Interest", cat: "Contracting", amount: 9.69, type: "Income", month: "Dec-25" },
-  { date: "2025-12-31", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -6.6, type: "Expense", month: "Dec-25" },
-  { date: "2026-01-06", detail: "Louise Williamson Inv186", cat: "Administrator", amount: -975.75, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "Gen D CIC", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "SBMEN", cat: "Programme Delivery and Activities", amount: -200, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "SACA", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "Holding Hands", cat: "Programme Delivery and Activities", amount: -100, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "NE African Women", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "SBIC", cat: "Programme Delivery and Activities", amount: -270, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "ICOS", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "Nigerian Muslim Co", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-08", detail: "MSA", cat: "Programme Delivery and Activities", amount: -440, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-12", detail: "Xero UK", cat: "Subscriptions & Memberships", amount: -4.44, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-30", detail: "Create Foundation Jan26", cat: "Programme Manager", amount: -6000, type: "Expense", month: "Jan-26" },
-  { date: "2026-01-31", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -6.9, type: "Expense", month: "Jan-26" },
-  { date: "2026-02-06", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Feb-26" },
-  { date: "2026-02-09", detail: "Xero UK", cat: "Subscriptions & Memberships", amount: -4.44, type: "Expense", month: "Feb-26" },
-  { date: "2026-02-10", detail: "Bayo Obasaju Expenses", cat: "Travel, accommodation and subsistence", amount: -108.5, type: "Expense", month: "Feb-26" },
-  { date: "2026-02-25", detail: "Louise Williamson", cat: "Administrator", amount: -25.18, type: "Expense", month: "Feb-26" },
-  { date: "2026-02-28", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -7.95, type: "Expense", month: "Feb-26" },
-];
+const SHEET_ID = "1qz5QLedp8uQcQB29jzaYT3LPwMxd_vOyq-F6L6fSDg0";
+const sheetURL = (tab) => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
 
 const BUDGET_MONTHS = ["Aug-25","Sep-25","Oct-25","Nov-25","Dec-25","Jan-26","Feb-26","Mar-26","Apr-26","May-26","Jun-26","Jul-26"];
-const BUDGET = {
-  staffing:   [10293, 10293, 10293, 11293, 12293, 12293, 23995, 23995, 23995, 23995, 23995, 23995],
-  directCosts:[1350,  6350,  7000, 14100,  8100,  7750,  9500, 10350, 10350, 10350, 12150, 15350],
-  overheads:  [236.25,1111.25,1225, 2467.50,1417.50,1356.25,1662.50,1811.25,1811.25,1811.25,2126.25,2686.25],
-};
-const ANNUAL_BUDGET = 343150;
 
 const CAT_MAP = {
   "Programme Manager": "staffing",
   "Administrator": "directCosts",
   "Programme Delivery and Activities": "directCosts",
   "Travel, accommodation and subsistence": "directCosts",
+  "Travel, accommodation and subsis": "directCosts",
   "Subscriptions & Memberships": "overheads",
 };
 
-const COMMITMENTS = { staffing: 21924, directCosts: 11576 };
-const TOTAL_COMMITMENTS = COMMITMENTS.staffing + COMMITMENTS.directCosts;
-const EXPECTED_INCOME = [{ label: "Q2 National Lottery Drawdown", amount: 71070, status: "Awaiting confirmation" }];
-const TOTAL_EXPECTED = 71070;
-const BANK_BALANCE = 274;
+// Lightweight CSV parser (handles quoted fields)
+function parseCSV(text) {
+  const rows = []; let current = []; let field = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { current.push(field.trim()); field = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        current.push(field.trim()); field = '';
+        if (current.some(c => c !== '')) rows.push(current);
+        current = [];
+      } else { field += ch; }
+    }
+  }
+  current.push(field.trim());
+  if (current.some(c => c !== '')) rows.push(current);
+  return rows;
+}
+
+// Convert DD/MM/YYYY to YYYY-MM-DD and derive month label
+function parseTxDate(raw) {
+  const parts = raw.split('/');
+  if (parts.length !== 3) return { iso: raw, month: '' };
+  const [d, m, y] = parts;
+  const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  const monthNames = { '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec' };
+  const shortYear = y.slice(-2);
+  return { iso, month: `${monthNames[m.padStart(2, '0')] || m}-${shortYear}` };
+}
+
+// Parse the unified sheet CSV into sections
+function parseSheetData(csvTexts) {
+  const { transactions: txCSV, budget: budgetCSV, pipeline: pipelineCSV, settings: settingsCSV } = csvTexts;
+
+  // --- TRANSACTIONS ---
+  const txRows = parseCSV(txCSV);
+  const transactions = txRows.slice(1).filter(r => r[0] && r[5]).map(r => {
+    const { iso, month } = parseTxDate(r[0]);
+    return { date: iso, detail: r[1] || '', cat: (r[4] || '').trim(), amount: parseFloat(r[5]) || 0, type: (r[3] || '').trim(), month };
+  });
+
+  // --- BUDGET ---
+  const budgetRowsAll = parseCSV(budgetCSV);
+  const staffCats = new Set(["Programme Manager", "Operations Lead", "Community Connector 1", "Community Connector 2", "Administrator", "Regional Lead", "Learning Manager"]);
+  const budget = { staffing: new Array(12).fill(0), directCosts: new Array(12).fill(0), overheads: new Array(12).fill(0) };
+  budgetRowsAll.slice(1).filter(r => r[0]).forEach(r => {
+    const cat = (r[0] || '').trim();
+    const type = (r[1] || '').trim();
+    for (let i = 0; i < 12; i++) {
+      const val = parseFloat(r[i + 2]) || 0;
+      if (staffCats.has(cat) || type === 'Staff') budget.staffing[i] += val;
+      else budget.directCosts[i] += val;
+    }
+  });
+  // Derive overheads as ~17.5% of direct costs (matching original model)
+  for (let i = 0; i < 12; i++) {
+    budget.overheads[i] = Math.round((budget.staffing[i] + budget.directCosts[i]) * 0.0175 * 100) / 100;
+  }
+
+  // --- PIPELINE ---
+  const pipeRows = parseCSV(pipelineCSV);
+  const commitments = { staffing: 0, directCosts: 0 };
+  const expectedIncome = [];
+  pipeRows.slice(1).filter(r => r[0]).forEach(r => {
+    const section = (r[0] || '').trim().toUpperCase();
+    if (section === 'COMMITMENT') {
+      const cat = (r[1] || '').trim().toLowerCase();
+      const amount = parseFloat(r[4]) || 0;
+      if (cat.includes('payroll') || cat.includes('management fee')) commitments.staffing += amount;
+      else commitments.directCosts += amount;
+    } else if (section === 'INCOME') {
+      expectedIncome.push({
+        label: (r[1] || '').trim(),
+        amount: parseFloat(r[3]) || 0,
+        status: (r[5] || '').trim(),
+      });
+    }
+  });
+
+  // --- SETTINGS ---
+  const settRows = parseCSV(settingsCSV);
+  const settings = {};
+  settRows.slice(1).filter(r => r[0]).forEach(r => { settings[(r[0] || '').trim()] = (r[1] || '').trim(); });
+
+  return { transactions, budget, commitments, expectedIncome, settings };
+}
 
 const fmtFinance = (n) => (n < 0 ? "-" : "") + "\u00a3" + Math.round(Math.abs(n)).toLocaleString("en-GB");
 const pct = (a, b) => b === 0 ? 0 : Math.round((a / b) * 100);
@@ -83,6 +131,11 @@ export default function Home() {
   const [prioritiesMap, setPrioritiesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Finance live data state
+  const [financeRaw, setFinanceRaw] = useState(null);
+  const [financeLoading, setFinanceLoading] = useState(true);
+  const [financeError, setFinanceError] = useState(null);
   
   // UI state
   const [activeTab, setActiveTab] = useState('gantt');
@@ -103,12 +156,43 @@ export default function Home() {
   const [expandedNotes, setExpandedNotes] = useState(new Set());
 
   // ============================================================
+  // FINANCE — Fetch live data from Google Sheets (4 tabs)
+  // ============================================================
+  useEffect(() => {
+    Promise.all([
+      fetch(sheetURL('Transactions')).then(r => r.text()),
+      fetch(sheetURL('Budget')).then(r => r.text()),
+      fetch(sheetURL('Pipeline')).then(r => r.text()),
+      fetch(sheetURL('Settings')).then(r => r.text()),
+    ])
+      .then(([tx, budget, pipeline, settings]) => {
+        setFinanceRaw(parseSheetData({ transactions: tx, budget, pipeline, settings }));
+        setFinanceLoading(false);
+      })
+      .catch(err => { console.error('Finance fetch error:', err); setFinanceError(err.message); setFinanceLoading(false); });
+  }, []);
+
+  // Derived finance values from live data
+  const TRANSACTIONS = financeRaw?.transactions || [];
+  const BUDGET = financeRaw?.budget || { staffing: new Array(12).fill(0), directCosts: new Array(12).fill(0), overheads: new Array(12).fill(0) };
+  const COMMITMENTS = financeRaw?.commitments || { staffing: 0, directCosts: 0 };
+  const EXPECTED_INCOME = financeRaw?.expectedIncome || [];
+  const ANNUAL_BUDGET = parseFloat(financeRaw?.settings?.annual_budget || '343150');
+  const BANK_BALANCE = parseFloat(financeRaw?.settings?.bank_balance || '274');
+  const OPENING_BALANCE = parseFloat(financeRaw?.settings?.opening_balance || '501');
+  const YTD_MONTH_COUNT = parseInt(financeRaw?.settings?.ytd_months || '7', 10);
+  const TOTAL_COMMITMENTS = COMMITMENTS.staffing + COMMITMENTS.directCosts;
+  const TOTAL_EXPECTED = EXPECTED_INCOME.reduce((s, e) => s + e.amount, 0);
+
+  // ============================================================
   // FINANCE — computed data (from approved artifact useMemo)
   // ============================================================
   const finData = useMemo(() => {
-    const ytdMonths = ["Aug-25","Sep-25","Oct-25","Nov-25","Dec-25","Jan-26","Feb-26"];
-    const active = ["Nov-25", "Dec-25", "Jan-26", "Feb-26"];
-    const idxMap = {"Aug-25":0,"Sep-25":1,"Oct-25":2,"Nov-25":3,"Dec-25":4,"Jan-26":5,"Feb-26":6};
+    const ytdMonths = BUDGET_MONTHS.slice(0, YTD_MONTH_COUNT);
+    // Active months = months that have actual transactions
+    const txMonths = new Set(TRANSACTIONS.map(t => t.month));
+    const active = ytdMonths.filter(m => txMonths.has(m));
+    const idxMap = {}; BUDGET_MONTHS.forEach((m, i) => { idxMap[m] = i; });
     const byMonth = {};
     ytdMonths.forEach(m => { byMonth[m] = { staffing: 0, directCosts: 0, overheads: 0, income: 0 }; });
     TRANSACTIONS.forEach(t => {
@@ -120,7 +204,7 @@ export default function Home() {
     ytdMonths.forEach(m => { const i = idxMap[m]; budgetMonth[m] = { staffing: BUDGET.staffing[i], directCosts: BUDGET.directCosts[i], overheads: BUDGET.overheads[i], total: BUDGET.staffing[i] + BUDGET.directCosts[i] + BUDGET.overheads[i] }; });
 
     const ytdB = { staffing: 0, directCosts: 0, overheads: 0 };
-    for (let i = 0; i <= 6; i++) { ytdB.staffing += BUDGET.staffing[i]; ytdB.directCosts += BUDGET.directCosts[i]; ytdB.overheads += BUDGET.overheads[i]; }
+    for (let i = 0; i < YTD_MONTH_COUNT; i++) { ytdB.staffing += BUDGET.staffing[i]; ytdB.directCosts += BUDGET.directCosts[i]; ytdB.overheads += BUDGET.overheads[i]; }
     ytdB.total = ytdB.staffing + ytdB.directCosts + ytdB.overheads;
 
     const ytdA = { staffing: 0, directCosts: 0, overheads: 0, income: 0 };
@@ -131,11 +215,11 @@ export default function Home() {
     ytdMonths.forEach(m => { const a = byMonth[m], b = budgetMonth[m]; bva.staffing += a.staffing; bva.directCosts += a.directCosts; bva.overheads += a.overheads; bva.spend += a.staffing + a.directCosts + a.overheads; bva.budget += b.total; });
     bva.variance = bva.budget - bva.spend;
 
-    const cf = []; let bal = 501;
+    const cf = []; let bal = OPENING_BALANCE;
     active.forEach(m => { const a = byMonth[m]; const out = a.staffing + a.directCosts + a.overheads; bal = bal + a.income - out; cf.push({ month: m, inflow: a.income, outflow: out, net: a.income - out, balance: bal }); });
 
     return { active, ytdMonths, byMonth, budgetMonth, ytdB, ytdA, bva, cf, truePos: BANK_BALANCE - TOTAL_COMMITMENTS + TOTAL_EXPECTED };
-  }, []);
+  }, [financeRaw]);
 
   const rag = (a, b) => { if (b === 0) return a === 0 ? "#16a34a" : "#dc2626"; const r = a / b; return r <= 0.85 ? "#16a34a" : r <= 1.0 ? "#ca8a04" : "#dc2626"; };
   const C = { bg: "#f8f9fb", card: "#ffffff", border: "#e5e7eb", text: "#1e293b", sub: "#64748b", muted: "#94a3b8", accent: "#2563eb", green: "#16a34a", amber: "#d97706", red: "#dc2626", purple: "#7c3aed" };
@@ -699,15 +783,27 @@ export default function Home() {
           {/* ============================================================ */}
           {activeTab === 'finance' && (
             <div style={{ fontFamily: "'Source Sans 3','Segoe UI',system-ui,sans-serif", background: C.bg, color: C.text, padding: "0", maxWidth: 1080, margin: "0 auto" }}>
+              {financeLoading ? (
+                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                  <div style={{ fontSize: 16, color: C.sub, marginBottom: 8 }}>Loading finance data from Google Sheets...</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>Fetching live data</div>
+                </div>
+              ) : financeError ? (
+                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                  <div style={{ fontSize: 16, color: C.red, marginBottom: 8 }}>Error loading finance data</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{financeError}</div>
+                </div>
+              ) : (<>
               <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, color: C.muted, textTransform: "uppercase" }}>TPWNEC</div>
                   <h2 style={{ fontSize: 22, fontWeight: 700, margin: "2px 0 0", color: C.text }}>Financial Dashboard</h2>
-                  <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>Year 1 &middot; Aug 2025 – Jul 2026 &middot; Data to 28 Feb 2026</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>Year 1 &middot; Aug 2025 – Jul 2026 &middot; Live from Google Sheets</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 11, color: C.sub }}>Year 1 Grant Award</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{fmtFinance(ANNUAL_BUDGET)}</div>
+                  <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>● Live data &middot; {TRANSACTIONS.length} transactions</div>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 2, marginBottom: 22, borderBottom: "2px solid " + C.border, flexWrap: "wrap" }}>
@@ -737,7 +833,7 @@ export default function Home() {
                 <div style={{ ...fCard, marginBottom: 18 }}>
                   <div style={fHead}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Year to Date &middot; Budget vs Spend</div>
-                    <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Aug 2025 – Feb 2026 (7 months)</div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Aug 2025 – {finData.ytdMonths[finData.ytdMonths.length - 1] || 'Feb 2026'} ({YTD_MONTH_COUNT} months)</div>
                   </div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
@@ -795,8 +891,8 @@ export default function Home() {
                 <div style={{ ...fCard, padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <span style={{ fontSize: 13, color: C.sub }}>Programme progress</span>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    {BUDGET_MONTHS.map((m, i) => (<div key={m} title={m} style={{ width: 22, height: 6, borderRadius: 3, background: i <= 6 ? C.accent : "#e2e8f0" }} />))}
-                    <span style={{ fontSize: 12, color: C.sub, marginLeft: 8 }}>7 of 12 months</span>
+                    {BUDGET_MONTHS.map((m, i) => (<div key={m} title={m} style={{ width: 22, height: 6, borderRadius: 3, background: i < YTD_MONTH_COUNT ? C.accent : "#e2e8f0" }} />))}
+                    <span style={{ fontSize: 12, color: C.sub, marginLeft: 8 }}>{YTD_MONTH_COUNT} of 12 months</span>
                   </div>
                 </div>
               </div>)}
@@ -936,9 +1032,10 @@ export default function Home() {
                   </div>
                 </div>
                 <div style={{ background: "#eff6ff", borderRadius: 10, border: "1px solid #bfdbfe", padding: "14px 20px", fontSize: 12, color: "#1e40af", marginTop: 16 }}>
-                  <strong>Note:</strong> Cashflow shows bank movements only. No income received since Dec 2025. Q2 drawdown ({fmtFinance(71070)}) expected imminently.
+                  <strong>Note:</strong> Cashflow shows bank movements only. No income received since Dec 2025. Q2 drawdown ({fmtFinance(TOTAL_EXPECTED)}) expected imminently.
                 </div>
               </div>)}
+            </>)}
             </div>
           )}
         </div>
