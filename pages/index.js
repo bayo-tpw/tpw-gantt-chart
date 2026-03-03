@@ -54,7 +54,7 @@ const ANNUAL_BUDGET = 343150;
 
 const CAT_MAP = {
   "Programme Manager": "staffing",
-  "Administrator": "staffing",
+  "Administrator": "directCosts",
   "Programme Delivery and Activities": "directCosts",
   "Travel, accommodation and subsistence": "directCosts",
   "Subscriptions & Memberships": "overheads",
