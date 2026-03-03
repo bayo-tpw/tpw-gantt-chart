@@ -1,5 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Head from 'next/head';
+
+// ============================================================
+// FINANCE DATA — from approved tpwnec_dashboard.jsx artifact
+// ============================================================
+const TRANSACTIONS = [
+  { date: "2025-11-07", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Nov-25" },
+  { date: "2025-11-18", detail: "The Angelou Centre", cat: "The National Lottery", amount: 273.55, type: "Income", month: "Nov-25" },
+  { date: "2025-11-20", detail: "Bayo Obasaju EXP-32", cat: "Programme Delivery and Activities", amount: -248, type: "Expense", month: "Nov-25" },
+  { date: "2025-11-20", detail: "Bayo Obasaju EXP-33", cat: "Programme Delivery and Activities", amount: -59.6, type: "Expense", month: "Nov-25" },
+  { date: "2025-11-20", detail: "Bayo Obasaju EXP-34", cat: "Programme Delivery and Activities", amount: -65.65, type: "Expense", month: "Nov-25" },
+  { date: "2025-11-30", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -6.9, type: "Expense", month: "Nov-25" },
+  { date: "2025-12-05", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Dec-25" },
+  { date: "2025-12-05", detail: "ARC Inv001", cat: "The National Lottery", amount: 5657.53, type: "Income", month: "Dec-25" },
+  { date: "2025-12-08", detail: "Create Foundation TPW01", cat: "Programme Manager", amount: -5657.53, type: "Expense", month: "Dec-25" },
+  { date: "2025-12-17", detail: "ARC Inv003", cat: "The National Lottery", amount: 15080.8, type: "Income", month: "Dec-25" },
+  { date: "2025-12-17", detail: "1 Strawberry Lane", cat: "Programme Delivery and Activities", amount: -102, type: "Expense", month: "Dec-25" },
+  { date: "2025-12-19", detail: "Create Foundation Q1", cat: "Programme Manager", amount: -10000, type: "Expense", month: "Dec-25" },
+  { date: "2025-12-23", detail: "ARC Inv002", cat: "The National Lottery", amount: 15080.08, type: "Income", month: "Dec-25" },
+  { date: "2025-12-23", detail: "Create Foundation Q1", cat: "Programme Manager", amount: -6721.37, type: "Expense", month: "Dec-25" },
+  { date: "2025-12-30", detail: "ARC Inv004", cat: "The National Lottery", amount: 5000, type: "Income", month: "Dec-25" },
+  { date: "2025-12-30", detail: "Create Foundation Q2 Dec", cat: "Programme Manager", amount: -8649.54, type: "Expense", month: "Dec-25" },
+  { date: "2025-12-31", detail: "Credit Interest", cat: "Contracting", amount: 9.69, type: "Income", month: "Dec-25" },
+  { date: "2025-12-31", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -6.6, type: "Expense", month: "Dec-25" },
+  { date: "2026-01-06", detail: "Louise Williamson Inv186", cat: "Administrator", amount: -975.75, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "Gen D CIC", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "SBMEN", cat: "Programme Delivery and Activities", amount: -200, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "SACA", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "Holding Hands", cat: "Programme Delivery and Activities", amount: -100, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "NE African Women", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "SBIC", cat: "Programme Delivery and Activities", amount: -270, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "ICOS", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "Nigerian Muslim Co", cat: "Programme Delivery and Activities", amount: -300, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-08", detail: "MSA", cat: "Programme Delivery and Activities", amount: -440, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-12", detail: "Xero UK", cat: "Subscriptions & Memberships", amount: -4.44, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-30", detail: "Create Foundation Jan26", cat: "Programme Manager", amount: -6000, type: "Expense", month: "Jan-26" },
+  { date: "2026-01-31", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -6.9, type: "Expense", month: "Jan-26" },
+  { date: "2026-02-06", detail: "Google Cloud", cat: "Subscriptions & Memberships", amount: -42, type: "Expense", month: "Feb-26" },
+  { date: "2026-02-09", detail: "Xero UK", cat: "Subscriptions & Memberships", amount: -4.44, type: "Expense", month: "Feb-26" },
+  { date: "2026-02-10", detail: "Bayo Obasaju Expenses", cat: "Travel, accommodation and subsistence", amount: -108.5, type: "Expense", month: "Feb-26" },
+  { date: "2026-02-25", detail: "Louise Williamson", cat: "Administrator", amount: -25.18, type: "Expense", month: "Feb-26" },
+  { date: "2026-02-28", detail: "Service Charge", cat: "Subscriptions & Memberships", amount: -7.95, type: "Expense", month: "Feb-26" },
+];
+
+const BUDGET_MONTHS = ["Aug-25","Sep-25","Oct-25","Nov-25","Dec-25","Jan-26","Feb-26","Mar-26","Apr-26","May-26","Jun-26","Jul-26"];
+const BUDGET = {
+  staffing:   [10293, 10293, 10293, 11293, 12293, 12293, 23995, 23995, 23995, 23995, 23995, 23995],
+  directCosts:[1350,  6350,  7000, 14100,  8100,  7750,  9500, 10350, 10350, 10350, 12150, 15350],
+  overheads:  [236.25,1111.25,1225, 2467.50,1417.50,1356.25,1662.50,1811.25,1811.25,1811.25,2126.25,2686.25],
+};
+const ANNUAL_BUDGET = 343150;
+
+const CAT_MAP = {
+  "Programme Manager": "staffing",
+  "Administrator": "staffing",
+  "Programme Delivery and Activities": "directCosts",
+  "Travel, accommodation and subsistence": "directCosts",
+  "Subscriptions & Memberships": "overheads",
+};
+
+const COMMITMENTS = { staffing: 21924, directCosts: 11576 };
+const TOTAL_COMMITMENTS = COMMITMENTS.staffing + COMMITMENTS.directCosts;
+const EXPECTED_INCOME = [{ label: "Q2 National Lottery Drawdown", amount: 71070, status: "Awaiting confirmation" }];
+const TOTAL_EXPECTED = 71070;
+const BANK_BALANCE = 274;
+
+const fmtFinance = (n) => (n < 0 ? "-" : "") + "\u00a3" + Math.round(Math.abs(n)).toLocaleString("en-GB");
+const pct = (a, b) => b === 0 ? 0 : Math.round((a / b) * 100);
 
 export default function Home() {
   // Authentication state
@@ -18,7 +86,7 @@ export default function Home() {
   
   // UI state
   const [activeTab, setActiveTab] = useState('gantt');
-  const [activeFinanceTab, setActiveFinanceTab] = useState('overview');
+  const [financeTab, setFinanceTab] = useState(0);
   
   // Gantt chart filters and options
   const [groupByPriority, setGroupByPriority] = useState(true);
@@ -35,63 +103,45 @@ export default function Home() {
   const [expandedNotes, setExpandedNotes] = useState(new Set());
 
   // ============================================================
-  // FINANCE DATA (hardcoded - future: connect to Google Sheets)
+  // FINANCE — computed data (from approved artifact useMemo)
   // ============================================================
-  const financeData = {
-    // Budget period: Aug 2025 - Jul 2026
-    monthLabels: ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','Mar-26','Apr-26','May-26','Jun-26','Jul-26'],
-    ytdMonths: 7, // Aug through Feb
-    
-    // Monthly budget by category (from drawdown Summary tab)
-    staffingBudget:    [7579, 9579, 9579, 16954, 12954, 12954, 21154, 22004, 22004, 22004, 22004, 22004],
-    directCostsBudget: [3200, 6575, 7339, 9307, 7257, 6845, 13604, 14736, 14736, 14736, 14736, 14736],
-    overheadsBudget:   [1100, 1600, 1600, 1600, 1600, 1600, 400,   1600,  1600,  1600,  1600,  1600],
-    
-    // Monthly actuals by category (Nov-Feb only, first 3 months no spend)
-    staffingActuals:    [0, 0, 0, 3500, 3500, 7200, 9800, 0, 0, 0, 0, 0],
-    directCostsActuals: [0, 0, 0, 1200, 800, 2100, 3400, 0, 0, 0, 0, 0],
-    overheadsActuals:   [0, 0, 0, 450, 380, 520, 610, 0, 0, 0, 0, 0],
-    
-    // Pipeline / Commitments
-    pipeline: [
-      { funder: 'National Lottery Community Fund', programme: 'Reaching Communities', amount: 343150, status: 'Awarded', probability: 100, type: 'committed' },
-      { funder: 'Garfield Weston Foundation', programme: 'Regular Grants', amount: 50000, status: 'Application Submitted', probability: 40, type: 'pending' },
-      { funder: 'Lloyds Bank Foundation', programme: 'Unrestricted Funding', amount: 75000, status: 'EOI Invited', probability: 30, type: 'pending' },
-      { funder: 'Northern Rock Foundation', programme: 'Community Development', amount: 25000, status: 'Researching', probability: 20, type: 'prospective' },
-      { funder: 'Community Foundation Tyne & Wear', programme: 'Grassroots Grants', amount: 15000, status: 'Researching', probability: 15, type: 'prospective' },
-    ],
-    
-    // Cashflow
-    openingBalance: 544,
-    // Monthly net cashflow (income minus expenditure)
-    monthlyNetCashflow: [0, 0, 0, 22710, 17130, 11079, 21348, 0, 0, 0, 0, 0],
-    // Grant drawdown schedule (when money comes in)
-    grantDrawdowns: [0, 0, 0, 28860, 21810, 21399, 35158, 58340, 58340, 0, 0, 0],
-  };
+  const finData = useMemo(() => {
+    const ytdMonths = ["Aug-25","Sep-25","Oct-25","Nov-25","Dec-25","Jan-26","Feb-26"];
+    const active = ["Nov-25", "Dec-25", "Jan-26", "Feb-26"];
+    const idxMap = {"Aug-25":0,"Sep-25":1,"Oct-25":2,"Nov-25":3,"Dec-25":4,"Jan-26":5,"Feb-26":6};
+    const byMonth = {};
+    ytdMonths.forEach(m => { byMonth[m] = { staffing: 0, directCosts: 0, overheads: 0, income: 0 }; });
+    TRANSACTIONS.forEach(t => {
+      if (!byMonth[t.month]) return;
+      if (t.type === "Income") { byMonth[t.month].income += t.amount; return; }
+      byMonth[t.month][CAT_MAP[t.cat] || "overheads"] += Math.abs(t.amount);
+    });
+    const budgetMonth = {};
+    ytdMonths.forEach(m => { const i = idxMap[m]; budgetMonth[m] = { staffing: BUDGET.staffing[i], directCosts: BUDGET.directCosts[i], overheads: BUDGET.overheads[i], total: BUDGET.staffing[i] + BUDGET.directCosts[i] + BUDGET.overheads[i] }; });
 
-  // Computed finance values
-  const sumSlice = (arr, start, end) => arr.slice(start, end).reduce((a, b) => a + b, 0);
-  const ytdBudget = sumSlice(financeData.staffingBudget, 0, 7) + sumSlice(financeData.directCostsBudget, 0, 7) + sumSlice(financeData.overheadsBudget, 0, 7);
-  const ytdActuals = sumSlice(financeData.staffingActuals, 0, 7) + sumSlice(financeData.directCostsActuals, 0, 7) + sumSlice(financeData.overheadsActuals, 0, 7);
-  const ytdVariance = ytdBudget - ytdActuals;
-  const annualBudget = financeData.staffingBudget.reduce((a,b) => a+b, 0) + financeData.directCostsBudget.reduce((a,b) => a+b, 0) + financeData.overheadsBudget.reduce((a,b) => a+b, 0);
-  
-  const ytdStaffingBudget = sumSlice(financeData.staffingBudget, 0, 7);
-  const ytdDirectCostsBudget = sumSlice(financeData.directCostsBudget, 0, 7);
-  const ytdOverheadsBudget = sumSlice(financeData.overheadsBudget, 0, 7);
-  const ytdStaffingActuals = sumSlice(financeData.staffingActuals, 0, 7);
-  const ytdDirectCostsActuals = sumSlice(financeData.directCostsActuals, 0, 7);
-  const ytdOverheadsActuals = sumSlice(financeData.overheadsActuals, 0, 7);
+    const ytdB = { staffing: 0, directCosts: 0, overheads: 0 };
+    for (let i = 0; i <= 6; i++) { ytdB.staffing += BUDGET.staffing[i]; ytdB.directCosts += BUDGET.directCosts[i]; ytdB.overheads += BUDGET.overheads[i]; }
+    ytdB.total = ytdB.staffing + ytdB.directCosts + ytdB.overheads;
 
-  // Cashflow running balance
-  const cashflowBalance = [];
-  let runningBalance = financeData.openingBalance;
-  for (let i = 0; i < 12; i++) {
-    const income = financeData.grantDrawdowns[i];
-    const expenditure = (financeData.staffingActuals[i] + financeData.directCostsActuals[i] + financeData.overheadsActuals[i]);
-    runningBalance = runningBalance + income - expenditure;
-    cashflowBalance.push(runningBalance);
-  }
+    const ytdA = { staffing: 0, directCosts: 0, overheads: 0, income: 0 };
+    TRANSACTIONS.forEach(t => { if (t.type === "Income") { ytdA.income += t.amount; return; } ytdA[CAT_MAP[t.cat] || "overheads"] += Math.abs(t.amount); });
+    ytdA.total = ytdA.staffing + ytdA.directCosts + ytdA.overheads;
+
+    const bva = { staffing: 0, directCosts: 0, overheads: 0, spend: 0, budget: 0 };
+    ytdMonths.forEach(m => { const a = byMonth[m], b = budgetMonth[m]; bva.staffing += a.staffing; bva.directCosts += a.directCosts; bva.overheads += a.overheads; bva.spend += a.staffing + a.directCosts + a.overheads; bva.budget += b.total; });
+    bva.variance = bva.budget - bva.spend;
+
+    const cf = []; let bal = 501;
+    active.forEach(m => { const a = byMonth[m]; const out = a.staffing + a.directCosts + a.overheads; bal = bal + a.income - out; cf.push({ month: m, inflow: a.income, outflow: out, net: a.income - out, balance: bal }); });
+
+    return { active, ytdMonths, byMonth, budgetMonth, ytdB, ytdA, bva, cf, truePos: BANK_BALANCE - TOTAL_COMMITMENTS + TOTAL_EXPECTED };
+  }, []);
+
+  const rag = (a, b) => { if (b === 0) return a === 0 ? "#16a34a" : "#dc2626"; const r = a / b; return r <= 0.85 ? "#16a34a" : r <= 1.0 ? "#ca8a04" : "#dc2626"; };
+  const C = { bg: "#f8f9fb", card: "#ffffff", border: "#e5e7eb", text: "#1e293b", sub: "#64748b", muted: "#94a3b8", accent: "#2563eb", green: "#16a34a", amber: "#d97706", red: "#dc2626", purple: "#7c3aed" };
+  const fCard = { background: C.card, borderRadius: 12, border: "1px solid " + C.border, overflow: "hidden" };
+  const fHead = { padding: "16px 24px", borderBottom: "1px solid " + C.border };
+  const FINANCE_TABS = ["Overview", "Budget vs Actuals", "Pipeline", "Cashflow"];
 
   // Fetch data on mount
   useEffect(() => {
@@ -138,10 +188,6 @@ export default function Home() {
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') handleLogin();
   };
-
-  // Format currency helper
-  const fmt = (val) => '£' + Math.round(val).toLocaleString('en-GB');
-  const fmtPct = (val) => (val * 100).toFixed(1) + '%';
 
   // Show login page if not authenticated
   if (!isAuthenticated) {
@@ -328,325 +374,6 @@ export default function Home() {
   const formatDate = (dateStr) => { if (!dateStr) return '-'; return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
 
   // ============================================================
-  // FINANCE TAB RENDER HELPERS
-  // ============================================================
-  const renderFinanceOverview = () => {
-    const spendPct = ytdActuals / ytdBudget;
-    const budgetCategories = [
-      { name: 'Staffing', budget: ytdStaffingBudget, actual: ytdStaffingActuals, color: '#3b82f6' },
-      { name: 'Direct Costs', budget: ytdDirectCostsBudget, actual: ytdDirectCostsActuals, color: '#10b981' },
-      { name: 'Overheads', budget: ytdOverheadsBudget, actual: ytdOverheadsActuals, color: '#f59e0b' },
-    ];
-
-    return (
-      <div>
-        {/* KPI Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          {[
-            { label: 'YTD Budget', value: fmt(ytdBudget), sub: 'Aug 25 – Feb 26 (7 months)', color: '#3b82f6' },
-            { label: 'YTD Spend', value: fmt(ytdActuals), sub: fmtPct(spendPct) + ' of budget', color: '#10b981' },
-            { label: 'YTD Variance', value: fmt(ytdVariance), sub: 'Under budget', color: '#f59e0b' },
-            { label: 'Annual Budget', value: fmt(annualBudget), sub: 'Aug 25 – Jul 26', color: '#8b5cf6' },
-          ].map((card, i) => (
-            <div key={i} style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: `3px solid ${card.color}` }}>
-              <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '4px' }}>{card.label}</div>
-              <div style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b' }}>{card.value}</div>
-              <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>{card.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* YTD Budget Breakdown */}
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', padding: '24px', marginBottom: '24px' }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#1e293b' }}>YTD Budget Breakdown</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Category</th>
-                <th style={{ textAlign: 'right', padding: '10px 12px', fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Budget</th>
-                <th style={{ textAlign: 'right', padding: '10px 12px', fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Spend</th>
-                <th style={{ textAlign: 'right', padding: '10px 12px', fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Variance</th>
-                <th style={{ textAlign: 'right', padding: '10px 12px', fontSize: '13px', color: '#64748b', fontWeight: '600' }}>% Spent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {budgetCategories.map((cat, i) => {
-                const variance = cat.budget - cat.actual;
-                const pctSpent = cat.budget > 0 ? cat.actual / cat.budget : 0;
-                return (
-                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px', fontSize: '14px', color: '#334155', fontWeight: '500' }}>
-                      <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', backgroundColor: cat.color, marginRight: '8px' }}></span>
-                      {cat.name}
-                    </td>
-                    <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px', color: '#334155' }}>{fmt(cat.budget)}</td>
-                    <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px', color: '#334155' }}>{fmt(cat.actual)}</td>
-                    <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px', color: variance >= 0 ? '#10b981' : '#ef4444', fontWeight: '500' }}>{fmt(variance)}</td>
-                    <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                        <div style={{ width: '60px', height: '6px', backgroundColor: '#f1f5f9', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${Math.min(pctSpent * 100, 100)}%`, height: '100%', backgroundColor: cat.color, borderRadius: '3px' }}></div>
-                        </div>
-                        <span style={{ fontSize: '13px', color: '#64748b' }}>{fmtPct(pctSpent)}</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr style={{ borderTop: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <td style={{ padding: '12px', fontSize: '14px', color: '#1e293b', fontWeight: '700' }}>Total</td>
-                <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px', color: '#1e293b', fontWeight: '700' }}>{fmt(ytdBudget)}</td>
-                <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px', color: '#1e293b', fontWeight: '700' }}>{fmt(ytdActuals)}</td>
-                <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px', color: '#10b981', fontWeight: '700' }}>{fmt(ytdVariance)}</td>
-                <td style={{ textAlign: 'right', padding: '12px', fontSize: '14px', color: '#64748b', fontWeight: '600' }}>{fmtPct(ytdActuals / ytdBudget)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  const renderBudgetVsActuals = () => {
-    const categories = [
-      { name: 'Staffing', budget: financeData.staffingBudget, actuals: financeData.staffingActuals, color: '#3b82f6' },
-      { name: 'Direct Costs', budget: financeData.directCostsBudget, actuals: financeData.directCostsActuals, color: '#10b981' },
-      { name: 'Overheads', budget: financeData.overheadsBudget, actuals: financeData.overheadsActuals, color: '#f59e0b' },
-    ];
-
-    return (
-      <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'auto' }}>
-        <div style={{ padding: '20px 24px 0' }}>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', color: '#1e293b' }}>Monthly Budget vs Actuals</h3>
-          <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#94a3b8' }}>Aug 2025 – Feb 2026 (YTD)</p>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '13px', color: '#64748b', fontWeight: '600', position: 'sticky', left: 0, backgroundColor: '#f8fafc', minWidth: '120px' }}>Category</th>
-                <th style={{ textAlign: 'left', padding: '10px 8px', fontSize: '13px', color: '#64748b', fontWeight: '600', minWidth: '50px' }}>Type</th>
-                {financeData.monthLabels.slice(0, 7).map((m, i) => (
-                  <th key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '12px', color: '#64748b', fontWeight: '600', minWidth: '75px' }}>{m}</th>
-                ))}
-                <th style={{ textAlign: 'right', padding: '10px 12px', fontSize: '13px', color: '#1e293b', fontWeight: '700', minWidth: '85px', backgroundColor: '#f1f5f9' }}>YTD Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((cat, ci) => {
-                const budgetTotal = sumSlice(cat.budget, 0, 7);
-                const actualsTotal = sumSlice(cat.actuals, 0, 7);
-                const varianceTotal = budgetTotal - actualsTotal;
-                return (
-                  <React.Fragment key={ci}>
-                    {/* Budget row */}
-                    <tr style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ci % 2 === 0 ? 'white' : '#fafbfc' }}>
-                      <td rowSpan={3} style={{ padding: '10px 12px', fontSize: '14px', color: '#334155', fontWeight: '600', borderRight: '1px solid #e2e8f0', verticalAlign: 'middle', position: 'sticky', left: 0, backgroundColor: ci % 2 === 0 ? 'white' : '#fafbfc' }}>
-                        <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '2px', backgroundColor: cat.color, marginRight: '6px' }}></span>
-                        {cat.name}
-                      </td>
-                      <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>Budget</td>
-                      {cat.budget.slice(0, 7).map((v, i) => (
-                        <td key={i} style={{ textAlign: 'right', padding: '8px', fontSize: '13px', color: '#475569' }}>{fmt(v)}</td>
-                      ))}
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontSize: '13px', fontWeight: '600', color: '#1e293b', backgroundColor: '#f1f5f9' }}>{fmt(budgetTotal)}</td>
-                    </tr>
-                    {/* Actuals row */}
-                    <tr style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: ci % 2 === 0 ? 'white' : '#fafbfc' }}>
-                      <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>Actual</td>
-                      {cat.actuals.slice(0, 7).map((v, i) => (
-                        <td key={i} style={{ textAlign: 'right', padding: '8px', fontSize: '13px', color: v > 0 ? '#334155' : '#cbd5e1' }}>{fmt(v)}</td>
-                      ))}
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontSize: '13px', fontWeight: '600', color: '#1e293b', backgroundColor: '#f1f5f9' }}>{fmt(actualsTotal)}</td>
-                    </tr>
-                    {/* Variance row */}
-                    <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: ci % 2 === 0 ? 'white' : '#fafbfc' }}>
-                      <td style={{ padding: '8px', fontSize: '12px', color: '#64748b' }}>Variance</td>
-                      {cat.budget.slice(0, 7).map((b, i) => {
-                        const v = b - cat.actuals[i];
-                        return <td key={i} style={{ textAlign: 'right', padding: '8px', fontSize: '13px', color: v >= 0 ? '#10b981' : '#ef4444', fontWeight: '500' }}>{fmt(v)}</td>;
-                      })}
-                      <td style={{ textAlign: 'right', padding: '8px 12px', fontSize: '13px', fontWeight: '700', color: varianceTotal >= 0 ? '#10b981' : '#ef4444', backgroundColor: '#f1f5f9' }}>{fmt(varianceTotal)}</td>
-                    </tr>
-                  </React.Fragment>
-                );
-              })}
-              {/* Grand total row */}
-              <tr style={{ backgroundColor: '#f1f5f9', borderTop: '3px solid #cbd5e1' }}>
-                <td style={{ padding: '12px', fontSize: '14px', fontWeight: '700', color: '#1e293b', position: 'sticky', left: 0, backgroundColor: '#f1f5f9' }}>Total</td>
-                <td style={{ padding: '8px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Budget</td>
-                {financeData.monthLabels.slice(0, 7).map((_, i) => {
-                  const total = financeData.staffingBudget[i] + financeData.directCostsBudget[i] + financeData.overheadsBudget[i];
-                  return <td key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>{fmt(total)}</td>;
-                })}
-                <td style={{ textAlign: 'right', padding: '10px 12px', fontSize: '14px', fontWeight: '700', color: '#1e293b', backgroundColor: '#e2e8f0' }}>{fmt(ytdBudget)}</td>
-              </tr>
-              <tr style={{ backgroundColor: '#f1f5f9' }}>
-                <td style={{ padding: '12px', position: 'sticky', left: 0, backgroundColor: '#f1f5f9' }}></td>
-                <td style={{ padding: '8px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Actual</td>
-                {financeData.monthLabels.slice(0, 7).map((_, i) => {
-                  const total = financeData.staffingActuals[i] + financeData.directCostsActuals[i] + financeData.overheadsActuals[i];
-                  return <td key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '13px', fontWeight: '700', color: total > 0 ? '#1e293b' : '#cbd5e1' }}>{fmt(total)}</td>;
-                })}
-                <td style={{ textAlign: 'right', padding: '10px 12px', fontSize: '14px', fontWeight: '700', color: '#1e293b', backgroundColor: '#e2e8f0' }}>{fmt(ytdActuals)}</td>
-              </tr>
-              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                <td style={{ padding: '12px', position: 'sticky', left: 0, backgroundColor: '#f1f5f9' }}></td>
-                <td style={{ padding: '8px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>Variance</td>
-                {financeData.monthLabels.slice(0, 7).map((_, i) => {
-                  const bTotal = financeData.staffingBudget[i] + financeData.directCostsBudget[i] + financeData.overheadsBudget[i];
-                  const aTotal = financeData.staffingActuals[i] + financeData.directCostsActuals[i] + financeData.overheadsActuals[i];
-                  const v = bTotal - aTotal;
-                  return <td key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '13px', fontWeight: '700', color: v >= 0 ? '#10b981' : '#ef4444' }}>{fmt(v)}</td>;
-                })}
-                <td style={{ textAlign: 'right', padding: '10px 12px', fontSize: '14px', fontWeight: '700', color: ytdVariance >= 0 ? '#10b981' : '#ef4444', backgroundColor: '#e2e8f0' }}>{fmt(ytdVariance)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  const renderPipeline = () => {
-    const committed = financeData.pipeline.filter(p => p.type === 'committed');
-    const pending = financeData.pipeline.filter(p => p.type === 'pending');
-    const prospective = financeData.pipeline.filter(p => p.type === 'prospective');
-    const totalPipeline = financeData.pipeline.reduce((a, p) => a + p.amount, 0);
-    const weightedPipeline = financeData.pipeline.reduce((a, p) => a + (p.amount * p.probability / 100), 0);
-
-    const statusColor = { 'Awarded': '#10b981', 'Application Submitted': '#3b82f6', 'EOI Invited': '#f59e0b', 'Researching': '#94a3b8' };
-
-    const renderGroup = (title, items, bgColor) => (
-      <div style={{ marginBottom: '20px' }}>
-        <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</h4>
-        {items.map((item, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', backgroundColor: bgColor, borderRadius: '6px', marginBottom: '8px', border: '1px solid #e2e8f0' }}>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>{item.funder}</div>
-              <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>{item.programme}</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <span style={{ padding: '4px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: '500', backgroundColor: `${statusColor[item.status] || '#94a3b8'}15`, color: statusColor[item.status] || '#475569' }}>
-                {item.status}
-              </span>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b' }}>{fmt(item.amount)}</div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>{item.probability}% probability</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-
-    return (
-      <div>
-        {/* Pipeline Summary Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <div style={{ padding: '18px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: '3px solid #10b981' }}>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Committed</div>
-            <div style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b' }}>{fmt(committed.reduce((a, p) => a + p.amount, 0))}</div>
-          </div>
-          <div style={{ padding: '18px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: '3px solid #3b82f6' }}>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Pending</div>
-            <div style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b' }}>{fmt(pending.reduce((a, p) => a + p.amount, 0))}</div>
-          </div>
-          <div style={{ padding: '18px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: '3px solid #f59e0b' }}>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Prospective</div>
-            <div style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b' }}>{fmt(prospective.reduce((a, p) => a + p.amount, 0))}</div>
-          </div>
-          <div style={{ padding: '18px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: '3px solid #8b5cf6' }}>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Weighted Pipeline</div>
-            <div style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b' }}>{fmt(weightedPipeline)}</div>
-          </div>
-        </div>
-
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', padding: '24px' }}>
-          {renderGroup('Committed Funding', committed, '#f0fdf4')}
-          {renderGroup('Pending Applications', pending, '#eff6ff')}
-          {renderGroup('Prospective Opportunities', prospective, '#fafafa')}
-        </div>
-      </div>
-    );
-  };
-
-  const renderCashflow = () => {
-    return (
-      <div>
-        {/* Cashflow KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: '3px solid #3b82f6' }}>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Opening Balance</div>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b' }}>{fmt(financeData.openingBalance)}</div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>1 Aug 2025</div>
-          </div>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: '3px solid #10b981' }}>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Current Balance</div>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: cashflowBalance[6] >= 0 ? '#1e293b' : '#ef4444' }}>{fmt(cashflowBalance[6])}</div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>End Feb 2026</div>
-          </div>
-          <div style={{ padding: '20px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderTop: '3px solid #f59e0b' }}>
-            <div style={{ fontSize: '13px', color: '#64748b' }}>Total Drawdowns</div>
-            <div style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b' }}>{fmt(sumSlice(financeData.grantDrawdowns, 0, 7))}</div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>YTD received</div>
-          </div>
-        </div>
-
-        {/* Cashflow Table */}
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'auto' }}>
-          <div style={{ padding: '20px 24px 0' }}>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', color: '#1e293b' }}>Monthly Cashflow</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#94a3b8' }}>Aug 2025 – Jul 2026</p>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                  <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: '13px', color: '#64748b', fontWeight: '600', position: 'sticky', left: 0, backgroundColor: '#f8fafc', minWidth: '130px' }}></th>
-                  {financeData.monthLabels.map((m, i) => (
-                    <th key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '12px', color: i < 7 ? '#1e293b' : '#94a3b8', fontWeight: i < 7 ? '600' : '400', minWidth: '75px' }}>{m}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '10px 12px', fontSize: '14px', fontWeight: '500', color: '#334155', position: 'sticky', left: 0, backgroundColor: 'white' }}>Grant Drawdowns</td>
-                  {financeData.grantDrawdowns.map((v, i) => (
-                    <td key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '13px', color: v > 0 ? '#10b981' : '#cbd5e1', fontWeight: v > 0 ? '500' : '400' }}>{v > 0 ? fmt(v) : '–'}</td>
-                  ))}
-                </tr>
-                <tr style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: '#fafbfc' }}>
-                  <td style={{ padding: '10px 12px', fontSize: '14px', fontWeight: '500', color: '#334155', position: 'sticky', left: 0, backgroundColor: '#fafbfc' }}>Total Expenditure</td>
-                  {financeData.monthLabels.map((_, i) => {
-                    const exp = financeData.staffingActuals[i] + financeData.directCostsActuals[i] + financeData.overheadsActuals[i];
-                    return <td key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '13px', color: exp > 0 ? '#ef4444' : '#cbd5e1', fontWeight: exp > 0 ? '500' : '400' }}>{exp > 0 ? '-' + fmt(exp) : '–'}</td>;
-                  })}
-                </tr>
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '10px 12px', fontSize: '14px', fontWeight: '500', color: '#334155', position: 'sticky', left: 0, backgroundColor: 'white' }}>Net Cashflow</td>
-                  {financeData.monthLabels.map((_, i) => {
-                    const income = financeData.grantDrawdowns[i];
-                    const exp = financeData.staffingActuals[i] + financeData.directCostsActuals[i] + financeData.overheadsActuals[i];
-                    const net = income - exp;
-                    return <td key={i} style={{ textAlign: 'right', padding: '10px 8px', fontSize: '13px', color: net > 0 ? '#10b981' : net < 0 ? '#ef4444' : '#cbd5e1', fontWeight: net !== 0 ? '600' : '400' }}>{net !== 0 ? fmt(net) : '–'}</td>;
-                  })}
-                </tr>
-                <tr style={{ borderTop: '2px solid #e2e8f0', backgroundColor: '#f1f5f9' }}>
-                  <td style={{ padding: '12px', fontSize: '14px', fontWeight: '700', color: '#1e293b', position: 'sticky', left: 0, backgroundColor: '#f1f5f9' }}>Closing Balance</td>
-                  {cashflowBalance.map((v, i) => (
-                    <td key={i} style={{ textAlign: 'right', padding: '12px 8px', fontSize: '14px', fontWeight: '700', color: v >= 0 ? '#1e293b' : '#ef4444' }}>{fmt(v)}</td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ============================================================
   // MAIN RENDER
   // ============================================================
   return (
@@ -654,6 +381,7 @@ export default function Home() {
       <Head>
         <title>TPW Regional Delivery Action Plan</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </Head>
       
       <div style={{ padding: '20px', fontFamily: 'system-ui', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
@@ -834,7 +562,7 @@ export default function Home() {
               <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '8px', fontSize: '14px', color: '#0369a1' }}>
                 <strong>Note:</strong> {chartData.some(item => item.hasStartDate) 
                   ? 'Milestones with start dates show actual duration. Others estimate 3 months before deadline.'
-                  : 'Start dates are estimated as 3 months before each deadline for visualization purposes.'}
+                  : 'Start dates are estimated as 3 months before each deadline for visualisation purposes.'}
                 {' '}Data synced from Airtable in real-time.
               </div>
             </>
@@ -939,8 +667,6 @@ export default function Home() {
                               {hasNotes ? (
                                 <button onClick={() => { const n = new Set(expandedNotes); isExpanded ? n.delete(action.id) : n.add(action.id); setExpandedNotes(n); }}
                                   style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: '16px', padding: '4px', borderRadius: '4px', transition: 'background-color 0.2s' }}
-                                  onMouseEnter={(e) => { e.target.style.backgroundColor = '#f0f9ff'; }}
-                                  onMouseLeave={(e) => { e.target.style.backgroundColor = 'transparent'; }}
                                   title={isExpanded ? 'Collapse notes' : 'Expand notes'}>
                                   {isExpanded ? '▼' : '▶'}
                                 </button>
@@ -969,40 +695,251 @@ export default function Home() {
           )}
 
           {/* ============================================================ */}
-          {/* FINANCE TAB */}
+          {/* FINANCE TAB — Approved tpwnec_dashboard.jsx layout */}
           {/* ============================================================ */}
           {activeTab === 'finance' && (
-            <>
-              {/* Finance Sub-tabs */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                {[
-                  { id: 'overview', label: 'Overview' },
-                  { id: 'bva', label: 'Budget vs Actuals' },
-                  { id: 'pipeline', label: 'Pipeline' },
-                  { id: 'cashflow', label: 'Cashflow' },
-                ].map(tab => (
-                  <button key={tab.id} onClick={() => setActiveFinanceTab(tab.id)}
-                    style={{
-                      padding: '10px 20px', fontSize: '14px', fontWeight: '500',
-                      border: '1px solid', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s',
-                      borderColor: activeFinanceTab === tab.id ? '#3b82f6' : '#e2e8f0',
-                      backgroundColor: activeFinanceTab === tab.id ? '#3b82f6' : 'white',
-                      color: activeFinanceTab === tab.id ? 'white' : '#475569',
-                    }}>
-                    {tab.label}
-                  </button>
+            <div style={{ fontFamily: "'Source Sans 3','Segoe UI',system-ui,sans-serif", background: C.bg, color: C.text, padding: "0", maxWidth: 1080, margin: "0 auto" }}>
+              <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, color: C.muted, textTransform: "uppercase" }}>TPWNEC</div>
+                  <h2 style={{ fontSize: 22, fontWeight: 700, margin: "2px 0 0", color: C.text }}>Financial Dashboard</h2>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>Year 1 &middot; Aug 2025 – Jul 2026 &middot; Data to 28 Feb 2026</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, color: C.sub }}>Year 1 Grant Award</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>{fmtFinance(ANNUAL_BUDGET)}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 2, marginBottom: 22, borderBottom: "2px solid " + C.border, flexWrap: "wrap" }}>
+                {FINANCE_TABS.map((t, i) => (
+                  <button key={t} onClick={() => setFinanceTab(i)} style={{ padding: "10px 20px", fontSize: 13, fontWeight: financeTab === i ? 600 : 400, cursor: "pointer", border: "none", borderBottom: financeTab === i ? "2px solid " + C.accent : "2px solid transparent", background: "transparent", color: financeTab === i ? C.accent : C.sub, marginBottom: -2, transition: "all 0.15s" }}>{t}</button>
                 ))}
               </div>
 
-              {activeFinanceTab === 'overview' && renderFinanceOverview()}
-              {activeFinanceTab === 'bva' && renderBudgetVsActuals()}
-              {activeFinanceTab === 'pipeline' && renderPipeline()}
-              {activeFinanceTab === 'cashflow' && renderCashflow()}
+              {/* OVERVIEW TAB */}
+              {financeTab === 0 && (<div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>
+                  {[
+                    { label: "Cash in Bank", value: BANK_BALANCE, color: C.accent, sub: "28 Feb 2026" },
+                    { label: "Committed Costs", value: -TOTAL_COMMITMENTS, color: C.amber, sub: "Owed to partners" },
+                    { label: "Expected Income", value: TOTAL_EXPECTED, color: C.green, sub: "Q2 Lottery drawdown" },
+                    { label: "True Position", value: finData.truePos, color: finData.truePos >= 0 ? C.green : C.red, sub: "Net after pipeline" },
+                  ].map((c, i) => (
+                    <div key={i} style={{ ...fCard, padding: "18px 20px", position: "relative" }}>
+                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: c.color }} />
+                      <div style={{ fontSize: 11, color: C.sub, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>{c.label}</div>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: c.color, letterSpacing: -0.5 }}>{fmtFinance(c.value)}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{c.sub}</div>
+                    </div>
+                  ))}
+                </div>
 
-              <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '8px', fontSize: '14px', color: '#0369a1' }}>
-                <strong>Note:</strong> Financial data is currently manually maintained. Budget figures sourced from NLCF Year 1 drawdown workbook Summary tab. Actuals cover Nov 2025 – Feb 2026 transaction period.
-              </div>
-            </>
+                <div style={{ ...fCard, marginBottom: 18 }}>
+                  <div style={fHead}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Year to Date &middot; Budget vs Spend</div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Aug 2025 – Feb 2026 (7 months)</div>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc" }}>
+                        <th style={{ padding: "10px 20px", textAlign: "left", color: C.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>Category</th>
+                        <th style={{ padding: "10px 16px", textAlign: "right", color: C.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>Budget</th>
+                        <th style={{ padding: "10px 16px", textAlign: "right", color: C.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>Spent</th>
+                        <th style={{ padding: "10px 16px", textAlign: "right", color: C.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>Remaining</th>
+                        <th style={{ padding: "10px 20px", textAlign: "right", color: C.muted, fontWeight: 500, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, minWidth: 130 }}>Used</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "Staffing", budget: finData.ytdB.staffing, actual: finData.ytdA.staffing },
+                        { label: "Direct Costs", budget: finData.ytdB.directCosts, actual: finData.ytdA.directCosts },
+                        { label: "Overheads", budget: finData.ytdB.overheads, actual: finData.ytdA.overheads },
+                      ].map((r, i) => { const p = pct(r.actual, r.budget); const rem = r.budget - r.actual; return (
+                        <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "14px 20px", fontWeight: 500 }}>{r.label}</td>
+                          <td style={{ padding: "14px 16px", textAlign: "right", color: C.sub }}>{fmtFinance(r.budget)}</td>
+                          <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 600 }}>{fmtFinance(r.actual)}</td>
+                          <td style={{ padding: "14px 16px", textAlign: "right", color: rem >= 0 ? C.green : C.red, fontWeight: 500 }}>{fmtFinance(rem)}</td>
+                          <td style={{ padding: "14px 20px" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
+                              <div style={{ width: 70, height: 7, background: "#f1f5f9", borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
+                                <div style={{ height: "100%", width: Math.min(p, 100) + "%", background: rag(r.actual, r.budget), borderRadius: 4 }} />
+                              </div>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: rag(r.actual, r.budget), minWidth: 34, textAlign: "right" }}>{p}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ); })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: "2px solid " + C.border, background: "#f8fafc" }}>
+                        {(() => { const p = pct(finData.ytdA.total, finData.ytdB.total); const rem = finData.ytdB.total - finData.ytdA.total; return (<>
+                          <td style={{ padding: "14px 20px", fontWeight: 700 }}>Total</td>
+                          <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 600, color: C.sub }}>{fmtFinance(finData.ytdB.total)}</td>
+                          <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 700 }}>{fmtFinance(finData.ytdA.total)}</td>
+                          <td style={{ padding: "14px 16px", textAlign: "right", fontWeight: 600, color: rem >= 0 ? C.green : C.red }}>{fmtFinance(rem)}</td>
+                          <td style={{ padding: "14px 20px" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
+                              <div style={{ width: 70, height: 7, background: "#f1f5f9", borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
+                                <div style={{ height: "100%", width: Math.min(p, 100) + "%", background: rag(finData.ytdA.total, finData.ytdB.total), borderRadius: 4 }} />
+                              </div>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: rag(finData.ytdA.total, finData.ytdB.total), minWidth: 34, textAlign: "right" }}>{p}%</span>
+                            </div>
+                          </td>
+                        </>); })()}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <div style={{ ...fCard, padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <span style={{ fontSize: 13, color: C.sub }}>Programme progress</span>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    {BUDGET_MONTHS.map((m, i) => (<div key={m} title={m} style={{ width: 22, height: 6, borderRadius: 3, background: i <= 6 ? C.accent : "#e2e8f0" }} />))}
+                    <span style={{ fontSize: 12, color: C.sub, marginLeft: 8 }}>7 of 12 months</span>
+                  </div>
+                </div>
+              </div>)}
+
+              {/* BUDGET VS ACTUALS TAB */}
+              {financeTab === 1 && (<div>
+                <div style={{ ...fCard, marginBottom: 18 }}>
+                  <div style={fHead}><div style={{ fontSize: 14, fontWeight: 600 }}>Monthly Spend by Category</div></div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead><tr style={{ borderBottom: "1px solid " + C.border }}>
+                        <th style={{ padding: "10px 16px", textAlign: "left", color: C.sub, fontWeight: 500 }}>Month</th>
+                        {["Staffing", "Direct Costs", "Overheads", "Total Spend", "Budget", "Variance"].map(h => (
+                          <th key={h} style={{ padding: "10px 12px", textAlign: "right", color: C.sub, fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {finData.ytdMonths.map(m => { const a = finData.byMonth[m], b = finData.budgetMonth[m]; const spend = a.staffing + a.directCosts + a.overheads; const v = b.total - spend; return (
+                          <tr key={m} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "10px 16px", fontWeight: 500 }}>{m}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", color: C.sub }}>{fmtFinance(a.staffing)}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", color: C.sub }}>{fmtFinance(a.directCosts)}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", color: C.sub }}>{fmtFinance(a.overheads)}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>{fmtFinance(spend)}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", color: C.sub }}>{fmtFinance(b.total)}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: v >= 0 ? C.green : C.red }}>{v >= 0 ? "+" : ""}{fmtFinance(v)}</td>
+                          </tr>
+                        ); })}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ borderTop: "2px solid " + C.border, background: "#f8fafc" }}>
+                          <td style={{ padding: "12px 16px", fontWeight: 700 }}>Total</td>
+                          <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 600, color: C.sub }}>{fmtFinance(finData.bva.staffing)}</td>
+                          <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 600, color: C.sub }}>{fmtFinance(finData.bva.directCosts)}</td>
+                          <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 600, color: C.sub }}>{fmtFinance(finData.bva.overheads)}</td>
+                          <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 700 }}>{fmtFinance(finData.bva.spend)}</td>
+                          <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 600, color: C.sub }}>{fmtFinance(finData.bva.budget)}</td>
+                          <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 700, color: finData.bva.variance >= 0 ? C.green : C.red }}>{finData.bva.variance >= 0 ? "+" : ""}{fmtFinance(finData.bva.variance)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              </div>)}
+
+              {/* PIPELINE TAB */}
+              {financeTab === 2 && (<div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18, marginBottom: 22 }}>
+                  <div style={fCard}>
+                    <div style={{ ...fHead, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.amber }}>Outstanding Commitments</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: C.amber }}>{fmtFinance(TOTAL_COMMITMENTS)}</div>
+                    </div>
+                    {[
+                      { label: "Staffing", amount: COMMITMENTS.staffing },
+                      { label: "Direct Costs", amount: COMMITMENTS.directCosts },
+                    ].map((c, i) => (
+                      <div key={i} style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: i === 0 ? "1px solid #f1f5f9" : "none", gap: 12 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{c.label}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: C.amber, whiteSpace: "nowrap" }}>{fmtFinance(c.amount)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={fCard}>
+                    <div style={{ ...fHead, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.green }}>Expected Income</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{fmtFinance(TOTAL_EXPECTED)}</div>
+                    </div>
+                    {EXPECTED_INCOME.map((e, i) => (
+                      <div key={i} style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                        <div><div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{e.label}</div><div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{e.status}</div></div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: C.green, whiteSpace: "nowrap" }}>{fmtFinance(e.amount)}</div>
+                      </div>
+                    ))}
+                    <div style={{ padding: "16px 24px", borderTop: "1px solid " + C.border, background: "#f8fdf9" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div><div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Net Pipeline</div><div style={{ fontSize: 11, color: C.muted }}>Income minus commitments</div></div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: C.green }}>+{fmtFinance(TOTAL_EXPECTED - TOTAL_COMMITMENTS)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ ...fCard, padding: 24 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>True Financial Position</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 28, height: 200, flexWrap: "wrap" }}>
+                    {[
+                      { label: "Cash in Bank", value: BANK_BALANCE, color: C.accent },
+                      { label: "Commitments", value: -TOTAL_COMMITMENTS, color: C.amber },
+                      { label: "Expected Income", value: TOTAL_EXPECTED, color: C.green },
+                      { label: "True Position", value: finData.truePos, color: C.purple },
+                    ].map((b, i) => { const mx = Math.max(TOTAL_EXPECTED, TOTAL_COMMITMENTS, finData.truePos); const h = Math.max(18, (Math.abs(b.value) / mx) * 150); return (
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 80 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: b.color, marginBottom: 6 }}>{fmtFinance(b.value)}</div>
+                        <div style={{ width: 52, height: h, background: b.color, borderRadius: "6px 6px 0 0", opacity: 0.8 }} />
+                        <div style={{ fontSize: 11, color: C.sub, marginTop: 8, textAlign: "center" }}>{b.label}</div>
+                      </div>
+                    ); })}
+                  </div>
+                </div>
+              </div>)}
+
+              {/* CASHFLOW TAB */}
+              {financeTab === 3 && (<div>
+                <div style={{ ...fCard, marginBottom: 18 }}>
+                  <div style={fHead}><div style={{ fontSize: 14, fontWeight: 600 }}>Monthly Cashflow</div></div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead><tr style={{ borderBottom: "1px solid " + C.border }}>
+                        {["Month", "Money In", "Money Out", "Net", "Balance"].map(h => (
+                          <th key={h} style={{ padding: "10px 20px", textAlign: h === "Month" ? "left" : "right", color: C.sub, fontWeight: 500 }}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {finData.cf.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "12px 20px", fontWeight: 500 }}>{r.month}</td>
+                            <td style={{ padding: "12px 20px", textAlign: "right", color: C.green }}>{fmtFinance(r.inflow)}</td>
+                            <td style={{ padding: "12px 20px", textAlign: "right", color: C.red }}>{fmtFinance(r.outflow)}</td>
+                            <td style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600, color: r.net >= 0 ? C.green : C.red }}>{r.net >= 0 ? "+" : ""}{fmtFinance(r.net)}</td>
+                            <td style={{ padding: "12px 20px", textAlign: "right", fontWeight: 600 }}>{fmtFinance(r.balance)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div style={{ ...fCard, padding: 24 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Balance Trend</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 150 }}>
+                    {finData.cf.map((r, i) => { const mx = Math.max(...finData.cf.map(x => Math.abs(x.balance))); const h = Math.max(8, (Math.abs(r.balance) / mx) * 120); return (
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: r.balance >= 0 ? C.green : C.red, marginBottom: 4 }}>{fmtFinance(r.balance)}</div>
+                        <div style={{ width: 44, height: h, background: r.balance >= 0 ? C.green : C.red, borderRadius: "5px 5px 0 0", opacity: 0.7 }} />
+                        <div style={{ fontSize: 11, color: C.sub, marginTop: 8 }}>{r.month}</div>
+                      </div>
+                    ); })}
+                  </div>
+                </div>
+                <div style={{ background: "#eff6ff", borderRadius: 10, border: "1px solid #bfdbfe", padding: "14px 20px", fontSize: 12, color: "#1e40af", marginTop: 16 }}>
+                  <strong>Note:</strong> Cashflow shows bank movements only. No income received since Dec 2025. Q2 drawdown ({fmtFinance(71070)}) expected imminently.
+                </div>
+              </div>)}
+            </div>
           )}
         </div>
       </div>
