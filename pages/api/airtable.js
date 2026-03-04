@@ -1,4 +1,9 @@
 export default async function handler(req, res) {
+  // TEMPORARY TEST - remove after debugging
+  if (req.query.test === '1') {
+    return res.status(200).json({ test: 'BUILD_MARCH_4_V2', envKeys: Object.keys(process.env).filter(k => k.includes('AIRTABLE')) });
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
