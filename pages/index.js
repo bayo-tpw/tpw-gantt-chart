@@ -198,11 +198,10 @@ export default function Home() {
 
   // ============================================================
   // DOCUMENTS — Fetch folder contents from Apps Script proxy
-  // Only fetches when Documents tab is active; re-fetches on navigation
+  // Preloads root folder on page load; re-fetches on navigation
   // ============================================================
   const currentDriveFolderId = drivePath[drivePath.length - 1].id;
   useEffect(() => {
-    if (activeTab !== 'documents') return;
     setDriveLoading(true);
     setDriveError(null);
     fetch(`${DRIVE_SCRIPT_URL}?folderId=${encodeURIComponent(currentDriveFolderId)}`)
@@ -213,7 +212,7 @@ export default function Home() {
         setDriveLoading(false);
       })
       .catch(err => { console.error('Drive fetch error:', err); setDriveError(err.message); setDriveLoading(false); });
-  }, [currentDriveFolderId, activeTab]);
+  }, [currentDriveFolderId]);
 
   const navigateDriveFolder = useCallback((folderId, folderName) => {
     setDrivePath(prev => [...prev, { id: folderId, name: folderName }]);
