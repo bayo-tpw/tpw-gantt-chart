@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Head from 'next/head';
 
 // ============================================================
-// FINANCE — Live data from Google Sheets (published CSV)
+// FINANCE — Live data from Google Sheets (published CSV) 
 // Sheet: "TPWNEC Finance Dashboard" — separate tabs
 // Spreadsheet ID: 1qz5QLedp8uQcQB29jzaYT3LPwMxd_vOyq-F6L6fSDg0
 // Tabs: Transactions, Budget, Pipeline, Settings
