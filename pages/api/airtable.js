@@ -5,6 +5,12 @@ export default async function handler(req, res) {
 
   try {
     console.log('API: Starting data fetch...');
+    console.log('ENV CHECK:', {
+      hasBaseId: !!process.env.AIRTABLE_BASE_ID,
+      hasApiKey: !!process.env.AIRTABLE_API_KEY,
+      baseIdLength: (process.env.AIRTABLE_BASE_ID || '').length,
+      apiKeyLength: (process.env.AIRTABLE_API_KEY || '').length,
+    });
     
     if (!process.env.AIRTABLE_BASE_ID || !process.env.AIRTABLE_API_KEY) {
       return res.status(500).json({ error: 'Missing environment variables' });
