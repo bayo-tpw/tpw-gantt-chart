@@ -10,6 +10,24 @@ import Head from 'next/head';
 const SHEET_ID = "1qz5QLedp8uQcQB29jzaYT3LPwMxd_vOyq-F6L6fSDg0";
 const sheetURL = (tab) => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
 
+// ============================================================
+// DOCUMENTS — Google Drive folder browser via Apps Script proxy
+// ============================================================
+const DRIVE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzuEYReDougqATtSmCBLzo0xfqkct67uSGhdS1H1nhnGFPS_Khz13QUKdIIwM3ac9ha/exec";
+const DRIVE_ROOT_FOLDER = "1xWuSc1PBVBFwfMdLFmRMzs_z2WwrtO1n"; // 01_Meetings
+
+// File type icon map for Documents tab
+const DRIVE_ICONS = {
+  'application/vnd.google-apps.folder': '\uD83D\uDCC1',
+  'application/vnd.google-apps.document': '\uD83D\uDCC4',
+  'application/vnd.google-apps.spreadsheet': '\uD83D\uDCCA',
+  'application/vnd.google-apps.presentation': '\uD83D\uDCCA',
+  'application/pdf': '\uD83D\uDCD5',
+  'image/png': '\uD83D\uDDBC\uFE0F', 'image/jpeg': '\uD83D\uDDBC\uFE0F',
+  '_default': '\uD83D\uDCC4',
+};
+const driveIcon = (mime) => DRIVE_ICONS[mime] || DRIVE_ICONS['_default'];
+
 const BUDGET_MONTHS = ["Aug-25","Sep-25","Oct-25","Nov-25","Dec-25","Jan-26","Feb-26","Mar-26","Apr-26","May-26","Jun-26","Jul-26"];
 
 const CAT_MAP = {
@@ -155,6 +173,12 @@ export default function Home() {
   const [selectedActionStatuses, setSelectedActionStatuses] = useState(new Set());
   const [expandedNotes, setExpandedNotes] = useState(new Set());
 
+  // Documents (Drive browser) state
+  const [drivePath, setDrivePath] = useState([{ id: DRIVE_ROOT_FOLDER, name: 'Documents' }]);
+  const [driveFiles, setDriveFiles] = useState([]);
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [driveError, setDriveError] = useState(null);
+
   // ============================================================
   // FINANCE — Fetch live data from Google Sheets (4 tabs)
   // ============================================================
@@ -170,6 +194,32 @@ export default function Home() {
         setFinanceLoading(false);
       })
       .catch(err => { console.error('Finance fetch error:', err); setFinanceError(err.message); setFinanceLoading(false); });
+  }, []);
+
+  // ============================================================
+  // DOCUMENTS — Fetch folder contents from Apps Script proxy
+  // Only fetches when Documents tab is active; re-fetches on navigation
+  // ============================================================
+  const currentDriveFolderId = drivePath[drivePath.length - 1].id;
+  useEffect(() => {
+    if (activeTab !== 'documents') return;
+    setDriveLoading(true);
+    setDriveError(null);
+    fetch(`${DRIVE_SCRIPT_URL}?folderId=${encodeURIComponent(currentDriveFolderId)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setDriveFiles(data.files || []);
+        setDriveLoading(false);
+      })
+      .catch(err => { console.error('Drive fetch error:', err); setDriveError(err.message); setDriveLoading(false); });
+  }, [currentDriveFolderId, activeTab]);
+
+  const navigateDriveFolder = useCallback((folderId, folderName) => {
+    setDrivePath(prev => [...prev, { id: folderId, name: folderName }]);
+  }, []);
+  const navigateDriveBreadcrumb = useCallback((index) => {
+    setDrivePath(prev => prev.slice(0, index + 1));
   }, []);
 
   // Derived finance values from live data
@@ -483,6 +533,7 @@ export default function Home() {
               { id: 'gantt', label: 'Gantt Chart' },
               { id: 'actions', label: 'Actions' },
               { id: 'finance', label: 'Finance' },
+              { id: 'documents', label: 'Documents' },
             ].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 style={{
@@ -1038,6 +1089,91 @@ export default function Home() {
             </>)}
             </div>
           )}
+
+          {/* ============================================================ */}
+          {/* DOCUMENTS TAB — Google Drive folder browser */}
+          {/* ============================================================ */}
+          {activeTab === 'documents' && (
+            <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+              {/* Breadcrumb navigation */}
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px', fontSize: '14px' }}>
+                {drivePath.map((crumb, i) => (
+                  <span key={crumb.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {i > 0 && <span style={{ color: '#94a3b8' }}>/</span>}
+                    {i < drivePath.length - 1 ? (
+                      <button onClick={() => navigateDriveBreadcrumb(i)}
+                        style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontWeight: '500', padding: '2px 4px', borderRadius: '4px', fontSize: '14px' }}>
+                        {crumb.name}
+                      </button>
+                    ) : (
+                      <span style={{ fontWeight: '600', color: '#1e293b', padding: '2px 4px' }}>{crumb.name}</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+
+              {/* Loading state */}
+              {driveLoading && (
+                <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
+                  <div style={{ fontSize: '24px', marginBottom: '12px' }}>Loading...</div>
+                  <div style={{ fontSize: '13px' }}>Fetching folder contents from Google Drive</div>
+                </div>
+              )}
+
+              {/* Error state */}
+              {driveError && !driveLoading && (
+                <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                  <div style={{ color: '#dc2626', fontWeight: '600', marginBottom: '8px' }}>Failed to load folder</div>
+                  <div style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>{driveError}</div>
+                  <button onClick={() => setDrivePath([...drivePath])}
+                    style={{ padding: '8px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Empty folder */}
+              {!driveLoading && !driveError && driveFiles.length === 0 && (
+                <div style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
+                  This folder is empty.
+                </div>
+              )}
+
+              {/* File listing */}
+              {!driveLoading && !driveError && driveFiles.length > 0 && (
+                <div>
+                  {driveFiles.map((file, i) => {
+                    const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
+                    const modified = file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+                    return (
+                      <div key={file.id}
+                        onClick={() => isFolder ? navigateDriveFolder(file.id, file.name) : window.open(file.url, '_blank')}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '12px',
+                          padding: '12px 20px', cursor: 'pointer',
+                          borderBottom: i < driveFiles.length - 1 ? '1px solid #f1f5f9' : 'none',
+                          transition: 'background-color 0.15s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <span style={{ fontSize: '20px', flexShrink: 0, width: '28px', textAlign: 'center' }}>{driveIcon(file.mimeType)}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '14px', fontWeight: isFolder ? '600' : '400', color: isFolder ? '#1e293b' : '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {file.name}
+                          </div>
+                          {modified && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{modified}</div>}
+                        </div>
+                        {isFolder && <span style={{ color: '#94a3b8', fontSize: '18px', flexShrink: 0 }}>&rsaquo;</span>}
+                        {!isFolder && <span style={{ color: '#94a3b8', fontSize: '11px', flexShrink: 0 }}>Open</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
     </>
